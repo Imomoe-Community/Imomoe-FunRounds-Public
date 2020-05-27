@@ -1,0 +1,188 @@
+"rounds"
+{
+	"0" //round number start at "1"
+	{
+		"name"			"example round"
+						//edit it
+		"info"			"example info"
+						//edit it
+		"thirdperson"	"0"
+						//"1" turn on thirdperson
+		"weapon"		"weapon_primary_random;weapon_secondary_random;other_equipment_random"
+						//"weapon_awp;weapon_p250" etc
+		"weaponfilter"	"all"
+						// "all" default everyone can give weapon
+						// "t" , "ct" ts/cts only give weapon
+						// "none" no one give weapon
+		"health"		"100"
+						//"random" everyone random health
+		"armor"			"100"
+						//"random" everyone random armor
+						//"heavy" heavyarmor
+		"fall"			"0"
+						//"0" no fall damage and physics bounce 
+						//other like "1" = 1x multiplier fall damage
+		"headshot"		"0"
+						//default "0" normal
+						//"1" only hs damage
+						//"-1" no hs damage
+		"gravity"		"1.0"
+						//player gravity multiplier
+		"speed"			"1.0"
+						//player speed multiplier
+		"hosttime"		"1.0"
+						//WIN SERVER NOT WORKING  global time multiplier
+		"infiniteammo"	"2"
+						//default "0"
+						//"1" inf clip ammo
+						//"2" inf reload ammo
+		"infinitenade"	"none"
+						//like "weapon_decoy"
+		"dodgeball"		"0"
+						//dodgeball mode 
+						//"infinitenade" must be "weapon_decoy" if enable
+		"norecoil"		"0"
+						//"1" no recoil
+						//"-1" very high recoil
+		"noknife"		"0"
+						//"1" remove knife
+		"zeus"			"-1"
+						// zeus recharge time  = mp_taser_recharge_time
+		"noscope"		"0"
+						//"1" no scope
+						//also disable aug/sg553 mouse right click
+		"autobhop"		"0"
+						// "1" turn on autobhop
+		"friction"		"5.2"
+						//world friction  = sv_friction
+		"backwards"		"0"
+						//"1" = sv_accelerate -5.5
+						//"2" real backwards  need low latency(ping)
+						//"3" only back!
+		"fff"			"0"
+						//"1" = inferno_damage 8192
+		"fov"			"90"
+						//player fov 
+		"vampire"		"0"
+						//"1" damage trans to self health 
+		"recoilview"	"0.055"
+						//recoilview = weapon_recoil_view_punch_extra
+		"freebuy"		"0"
+						//"1" = mp_buytime 3600 & mp_maxmoney 65535
+		"pcolor"		"null"
+						//player color
+						//"black", "pink", "green", "red", "blue"
+						//"transcolor" set player translucent
+		"chicken"		"0"
+						//"1" set all player to chicken
+		"damage"		"1"
+						//"1" default
+						//"delay" damage delay 3 seconds
+						//"dodgeball" decoy 200 damage
+						//"random" random damage
+						//"taser" zeus 10x multiplier knife 20x multiplier
+						//"noknife" knife no damage
+						//else like "2" 2x multiplier
+		"money"			"0"
+						//set player money
+		"speedchange"	"0"
+						//"1" enable speedchange
+		"randomspawn"	"0"
+						//"1" enable random spawn
+						//need "respawn" set to "1"
+		"friendlyfire"	"0"
+						//ff multiplier
+		"ffa"			"0"
+						//"1" enable free for all
+		"ghost"			"0"
+						//"1" all ghost
+						//"2" ts "3" cts
+		"chrono"		"0"
+						//"1" enable teleport mode
+		"c4num"			"1"
+						//round start give c4
+		"suicide"		"1"
+						//suicide bomber
+		"respawn"		"1"
+						//force respawn players
+		"c4time"		"45"
+						//set c4 time
+						//"0" instant explode
+		"hidehud"		"none"
+						//"radar" hide player radar
+						//"crosshair" hide player crosshair and inventory
+						//"all" hide all hud
+		"nademode"		"none" //ignore this
+		"defmode"		"1"
+						// "0" default
+						// "1" or "chicken" chicken carry planted c4
+						// "2" or "carry" player carry planted c4
+		"fws"			"0"
+						//"1" enable fast weapon switch
+		"tkallow"		"0"
+						//"0" default disable
+						//"2" kill 2 teammate will force suicide
+		"oneshot"		"0"
+						//"1" clip 1 ammo
+		"blademail"		"0.0"
+						//damage taken back to attacker
+						//multiplier value
+		"drop"			"1"
+						//default "1"
+						//"0" cannot drop weapon
+		"aimbot"		"0"
+						//"1" 20 fov aimbot with recoil control
+						//"2" 360 fov aimbot with aimlock and client-side no recoil
+		"wallhack"		"0"
+						//"1" turn on wallhack (need another plugin)
+		"selfdmg"		"0.0"
+						// = mp_weapon_self_inflict_amount
+		"eb"			"-1"
+						//"-1" default turn off
+						//value > 0 explosive bullet with cooldown
+						//"0" no cooldown
+		"throwknife"	"0"
+						//"1" enable
+		"chickeneater"	"1"
+						//"1" default enable eat chicken
+		"knockback"		"1"
+						//"0" disable weapon fire knockback
+						//"1" enable player knockback with sm_knockback
+		"wallhang"		"0"
+						//"1" enable player hanging wall/tree/etc
+		"tesla"			"0"
+						//"1" enablt zeus fire isual effects and 45% health/maxhealth damage 
+		"deftime"		"5.0"
+						//defusing c4 timer (non defusekit time x2)
+		"planttime"		"3.0"
+						//planting c4 timer
+		"exojump"		"0"
+						//"1" give players exojump
+		"meleerange"	"0"
+						// = sv_knife_attack_extend_from_player_aabb
+		"armrace"		"0"
+						//"1" kill other player will change weapon
+		"grapplehook"	"0"
+						//"1" players can use grapplehook by press "use" key
+		"shield"		"0"
+						//"1" energy shield like fortnite
+		"autofire"		"0"
+						//"1" trigger bot
+		"autostrafe"	"0"
+						//"1" enable autostrafe
+		"bossevolve"	"0"
+						//"1" enable bossevolve mode
+		"timermoney"	"0;0"
+						//"5,100" every 5s give 100 money if player alive 
+		"bossmode"		"0"
+						//boss vs all other player
+						//"2" 2 bosses
+		"autorespawn"	"0;0;0"
+						//format like "all;5;1"
+						//"all" or "t" or "ct"  also can be 1/2/3
+						//"5" 5s respawn
+						//"1" use spawn wave
+		"br"			"0"
+						//"1" enable battle royale(Mai Ooizumi Editon)
+	}
+}

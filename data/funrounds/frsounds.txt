@@ -1,0 +1,87 @@
+"frsounds"
+{
+	"headshot"
+	{
+		"1"
+		{
+			"sound"			"funrounds/sounds/headshot.mp3"
+		}
+	}
+	"knife"
+	{
+		"1"
+		{
+			"sound"			"funrounds/sounds/knife.mp3"
+		}
+	}
+	"inferno"
+	{
+		"1"
+		{
+			"sound"			"funrounds/sounds/inferno.mp3"
+		}
+	}
+	"grenade"
+	{
+		"1"
+		{
+			"sound"			"funrounds/sounds/grenade.mp3"
+		}
+	}
+	"otherkill"
+	{
+		"1"
+		{
+			"sound"			"funrounds/sounds/kill.mp3"
+		}
+	}
+	"suicide"
+	{
+		"1"
+		{
+			"sound"			"funrounds/sounds/suicide.mp3"
+		}
+	}
+	"teamkill"
+	{
+		"1"
+		{
+			"sound"			"funrounds/sounds/teamkill.mp3"
+		}
+	}
+	"roundstart"
+	{
+		"1"
+		{
+			"sound"			"funrounds/sounds/roundstart.mp3"
+		}
+	}
+	"ctwin"
+	{
+		"1"
+		{
+			"sound"			"funrounds/sounds/ctwin.mp3"
+		}
+	}
+	"trwin"
+	{
+		"1"
+		{
+			"sound"			"funrounds/sounds/trwin.mp3"
+		}
+	}
+	"rounddraw"
+	{
+		"1"
+		{
+			"sound"			"funrounds/sounds/rounddraw.mp3"
+		}
+	}
+	"joinserver"
+	{
+		"1"
+		{
+			"sound"			"funrounds/sounds/joinserver.mp3"
+		}
+	}
+}
