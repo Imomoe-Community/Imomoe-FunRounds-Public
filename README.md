@@ -53,7 +53,9 @@ funrounds/suicide/suicide3.mp3
 funrounds/suicide/warning1.mp3
 funrounds/suicide/warning2.mp3
 funrounds/suicide/warning3.mp3
+funrounds/sounds/chickensound.mp3
 ```
+以上文件需要全部放入``sound``目录下
 
 如果您做不到这一点还想弄出跟“妹萌え!”社区类似甚至一样的效果
 
