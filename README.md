@@ -61,6 +61,17 @@ funrounds/sounds/chickensound.mp3
 
 请联系我获取技术支持或者睡大觉
 
+## Credits
+
+https://forums.alliedmods.net/showthread.php?t=265885 Original FunRounds
+https://forums.alliedmods.net/showthread.php?t=190363 StealthMod
+https://forums.alliedmods.net/showthread.php?t=269846 Throwing Knives
+https://forums.alliedmods.net/showthread.php?t=254442 Chicken C4
+https://forums.alliedmods.net/showthread.php?t=276986 Carry C4
+https://forums.alliedmods.net/showthread.php?t=290013 Chicken Eater
+https://forums.alliedmods.net/showthread.php?t=283342 Aimbot
+https://forums.alliedmods.net/showthread.php?p=2512883 Chicken Wars
+
 ## License
 ```
 妹萌え! FunRounds!
