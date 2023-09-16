@@ -1,12 +1,12 @@
 bool frKilledBySuicide[MAXPLAYERS + 1];
 bool frIsSuicideBomber[MAXPLAYERS + 1];
 bool frIsGoingSuicide[MAXPLAYERS + 1];
-bool frTriggeredSuicide[MAXPLAYERS + 1] = false;
+bool frTriggeredSuicide[MAXPLAYERS + 1];
 char frSuicideSound[][] =  { "funrounds/suicide/suicide1.mp3", "funrounds/suicide/suicide2.mp3", "funrounds/suicide/suicide3.mp3" };
 char frSuicideWarningSound[][] =  { "funrounds/suicide/warning1.mp3", "funrounds/suicide/warning2.mp3", "funrounds/suicide/warning3.mp3" };
 char frExplodeSound[][] =  { "weapons/c4/c4_explode1.wav", "weapons/c4/c4_exp_deb2.wav" };
 int frBomb[MAXPLAYERS + 1];
-int killed[MAXPLAYERS + 1] = 0;
+int killed[MAXPLAYERS + 1];
 int frDiedByBomb[MAXPLAYERS + 1] =  { -1, ... };
 
 void FrSuicideBomberStart()
@@ -53,25 +53,24 @@ void PreSuicide(int client)
 		int weapon = -1;
 		while ((weapon = GetPlayerWeaponSlot(client, i)) != -1)
 		{
-			if (CSGOItems_IsValidWeapon(weapon))
+			if ((IsValidEntity(weapon) && IsValidEdict(weapon)) || CSGOItems_IsValidWeapon(weapon))
 			{
 				char classname[64];
 				GetEntityClassname(weapon, classname, sizeof(classname));
 				if (!StrEqual(classname, "weapon_c4") && GetEntPropEnt(weapon, Prop_Send, "m_hOwnerEntity") == client)
 				{
 					CS_DropWeapon(client, weapon, false);
-					//RemoveEdict(weapon);
 				}
-				else if (StrContains(classname, "weapon_") != -1)
+				else if (StrContains(classname, "weapon_", false) != -1)
 				{
-					//CSGOItems_RemoveWeapon(client, weapon);
 					RemovePlayerItem(client, weapon);
 					AcceptEntityInput(weapon, "Kill");
+					RemoveEntity(weapon);
 				}
 			}
 		}
 	}
-	//EquipPlayerWeapon(client, GivePlayerItem(client, "weapon_fists"));
+	EquipPlayerWeapon(client, GivePlayerItem(client, "weapon_fists"));
 	int rdmSound = GetRandomInt(0, sizeof(frSuicideWarningSound) - 1);
 	if (GetClientTeam(client) == CS_TEAM_T) EmitSoundToAll(frSuicideWarningSound[rdmSound], client, SNDCHAN_USER_BASE, SNDLEVEL_RAIDSIREN);
 	SetSpeed(client, GetEntPropFloat(client, Prop_Data, "m_flLaggedMovementValue") * 1.6);
@@ -98,6 +97,7 @@ public Action Timer_DelayExplosion(Handle timer, int client)
 	{
 		TriggerSuicide(client);
 	}
+	return Plugin_Continue;
 }
 void TriggerSuicide(int client)
 {
@@ -107,7 +107,6 @@ void TriggerSuicide(int client)
 	int rdmSound = GetRandomInt(0, sizeof(frSuicideSound) - 1);
 	EmitSoundToAll(frSuicideSound[rdmSound], client, SNDCHAN_USER_BASE, SNDLEVEL_RAIDSIREN);
 	EmitAmbientSound(frExplodeSound[GetRandomInt(0, sizeof(frExplodeSound) - 1)], NULL_VECTOR, client);
-	EquipPlayerWeapon(client, GivePlayerItem(client, "weapon_c4"));
 	ProcessSuicide(client);
 	ShowSuicideText(client);
 }
@@ -118,6 +117,7 @@ public Action Timer_Run(Handle timer, any ent)
 		AcceptEntityInput(ent, "Start");
 		CreateTimer(7.0, Timer_Die, ent);
 	}
+	return Plugin_Continue;
 }
 
 public Action Timer_Die(Handle timer, any ent)
@@ -129,12 +129,14 @@ public Action Timer_Die(Handle timer, any ent)
 			AcceptEntityInput(ent, "Kill");
 		}
 	}
+	return Plugin_Continue;
 }
 void ProcessSuicide(int client)
 {
 	SetFF(true);
 	killed[client] = 0;
-	int weapon = GetPlayerWeaponSlot(client, CS_SLOT_C4);
+	int weapon = GivePlayerItem(client, "weapon_c4");
+	EquipPlayerWeapon(client, weapon);
 	if (!IsValidEntity(weapon)) weapon = client;
 	for (int i = 1; i <= MaxClients; ++i)
 	{
@@ -145,8 +147,8 @@ void ProcessSuicide(int client)
 		
 	}
 	float damage = GetHealth(client) * 10.0;
-	CreateDamage(0.0, client, client, weapon, damage, CS_DMG_HEADSHOT, weapon, true);
-	DisarmPlayerWeapons(client);
+	CreateDamage(0.0, client, client, client, damage, CS_DMG_HEADSHOT, client, true);
+	AcceptEntityInput(weapon, "Kill");
 	SetFF(false);
 	//SDKHooks_TakeDamage(client, weapon, client, (GetHealth(client) + 0.00) * 10, CS_DMG_HEADSHOT, weapon);
 }
@@ -165,12 +167,14 @@ void ShowSuicideText(int client)
 		}
 	}
 	int team = GetClientTeam(client);
+	if (frTriggeredSuicide[client])
+		--killed[client];
 	if (killed[client] >= 1)
 	{
 		if (team == CS_TEAM_T)
 		{
 			if (!frTriggeredSuicide[client]) PrintToChatAll("[SM] \x06%s\x01 高喊“安拉胡阿克巴！”英勇的引爆了自杀式炸弹并炸飞了 \x06%i\x01 人!", name, killed[client]);
-			else PrintToChatAll("[SM] \x06%s\x01 来不及喊“安拉胡阿克巴！”身上的炸弹就被引爆了并炸飞了 \x06%i\x01 人!", name, killed[client]);
+			else PrintToChatAll("[SM] \x06%s\x01 来不及喊“安拉胡阿克巴！”身上的炸弹就被引爆了并炸飞了 \x06%i\x01 人!", name, killed[client] - 1);
 		}
 		if (team == CS_TEAM_CT) PrintToChatAll("[SM] \x06%s\x01 壮烈牺牲了，但是连带炸飞了 \x06%i\x01 人!", name, killed[client]);
 	}
@@ -236,7 +240,7 @@ void SuicideKill(int client, int victim, int weapon = 0)
 	else
 	{
 		distance -= 400.0;
-		int damage = RoundToFloor(500.0 - distance * 1.25);
+		int damage = RoundToFloor(1000.0 - distance * FLOAT_PI);
 		if (damage > 0)
 		{
 			int hp = GetHealth(victim);
@@ -258,8 +262,12 @@ void SuicideKill(int client, int victim, int weapon = 0)
 }
 public Action Command_GoSuicide(int client, int args)
 {
-	if (!cvSuicideBomber.BoolValue || !bSuicide)
+	if (!cvSuicideBomber.BoolValue || !bSuicide || frRoundEnd || frIsGoingSuicide[client])
+	{
+		if (IsValidClient(client) && !IsFakeClient(client))
+			PrintToChat(client, "[SM] 现在还不可以自爆");
 		return Plugin_Stop;
+	}
 	if (IsValidClient(client) && IsPlayerAlive(client))
 	{
 		if (frIsSuicideBomber[client] && !frIsGoingSuicide[client])
@@ -270,7 +278,7 @@ public Action Command_GoSuicide(int client, int args)
 		{
 			if (CS_GetClientContributionScore(client) < 5 && GetMoney(client) < 10000)
 			{
-				PrintToChat(client, "您身上没有c4也无法购买c4，无法自爆");
+				PrintToChat(client, "[SM] 您身上没有c4也无法购买c4，无法自爆");
 				return Plugin_Stop;
 			}
 			if (GetMoney(client) >= 10000)

@@ -1,8 +1,13 @@
-bool frIsGhostClient[MAXPLAYERS + 1] = false;
-bool frIsPlayerVisible[MAXPLAYERS + 1] = true;
-Handle frGhostBreathTimers[MAXPLAYERS + 1] = INVALID_HANDLE;
-char frGhostBreathSound[] =  { "player/breathe1.wav" };
+static bool frIsGhostClient[MAXPLAYERS + 1];
+bool frIsPlayerVisible[MAXPLAYERS + 1];
+Handle frGhostBreathTimers[MAXPLAYERS + 1];
+char frGhostBreathSound[] = "player/breathe1.wav";
 //char frGhostHeartSound[PLATFORM_MAX_PATH] =  { "player/heartbeatloop.wav" };
+
+stock bool CheckGhostPlayer(int client)
+{
+	return frIsGhostClient[client];
+}
 
 void FrGhostOnMapStart()
 {
@@ -12,49 +17,41 @@ void FrGhostOnMapStart()
 void EnableGhost(int team)
 {
 	if (team <= 0) return;
-	bGhost = true;
 	SetCvar("mp_teamname_1", "潜伏者");
 	SetCvar("mp_teamname_2", "保卫者");
 	for (int i = 1; i <= MaxClients; ++i)
 	{
 		if ((team > 1) && IsValidClient(i) && !IsFakeClient(i) && GetClientTeam(i) == team)
 		{
-			SetPlayerGhost(i);
+			PlayerGhostStatus(i, true);
 		}
 		else if (IsValidClient(i) && !IsFakeClient(i) && (team == 1))
 		{
 			{
-				SetPlayerGhost(i);
+				PlayerGhostStatus(i, true);
 			}
 		}
 	}
 }
 void DisableGhost()
 {
-	bGhost = false;
 	for (int i = 1; i <= MaxClients; ++i)
 	{
 		if(IsValidClient(i))
 		{
-			RemovePlayerGhost(i);
+			PlayerGhostStatus(i, false);
 			frIsPlayerVisible[i] = false;
 			SetEntityRenderMode(i, RENDER_NORMAL);
 			SetEntityRenderColor(i, 255, 255, 255, 0);
 		}
 	}
 }
-void SetPlayerGhost(int client)
+void PlayerGhostStatus(int client, bool status)
 {
-	frIsGhostClient[client] = true;
-	FrGhostVisibility(client, false);
-	KillTimerHandle(frGhostBreathTimers[client]);
-	frGhostBreathTimers[client] = CreateTimer(GetConVarFloat(cvFrBreathSound), Timer_BreathSound, GetClientUserId(client), TIMER_REPEAT | TIMER_FLAG_NO_MAPCHANGE);
-}
-void RemovePlayerGhost(int client)
-{
-	StopBreathSound(client);
-	FrGhostVisibility(client, true);
-	frIsGhostClient[client] = false;
+	frIsGhostClient[client] = status;
+	if (IsValidClient(client) && IsPlayerAlive(client)) FrGhostVisibility(client, !status);
+	if (status)
+		frGhostBreathTimers[client] = CreateTimer(GetConVarFloat(cvFrBreathSound), Timer_BreathSound, GetClientUserId(client), TIMER_REPEAT | TIMER_FLAG_NO_MAPCHANGE);
 }
 
 void FrGhostVisibility(int client, bool visible)
@@ -97,9 +94,9 @@ void StopBreathSound(int client)
 {
 	KillTimerHandle(frGhostBreathTimers[client]);
 }
-void SetGhostVisibility(int entity, bool visible)
+void SetGhostVisibility(int entity, bool visible, bool enable = true)
 {
-	if (bGhost)
+	if (frIsGhostClient[entity] && enable)
 	{
 		SetEntityRenderMode(entity, RENDER_TRANSCOLOR);
 		//SetEntityRenderMode(entity, RENDER_NONE);
@@ -120,31 +117,28 @@ void SetGhostVisibility(int entity, bool visible)
 public Action Delay_SetInVisible(Handle timer, any userid)
 {
 	int client = GetClientOfUserId(userid);
-	if (!frIsPlayerVisible[client] || !IsValidClient(client)) return;
+	if (!frIsPlayerVisible[client] || !IsValidClient(client)) return Plugin_Stop;
 	frIsPlayerVisible[client] = false;
 	SetGhostVisibility(client, false);
 	SetClientWeaponsVisibility(client, false);
 	FadeClient(client, 64, 0, 64, 64);
-	
+	return Plugin_Continue;
 }
 public Action Timer_BreathSound(Handle timer, any userid)
 {
 	int client = GetClientOfUserId(userid);
 	if (IsValidClient(client) && IsPlayerAlive(client) && frIsGhostClient[client])
 	{
-		float pos[3];
-		GetEntPropVector(client, Prop_Send, "m_vecOrigin", pos);
-		//EmitAmbientSound(frGhostBreathSound, pos, client, SNDLEVEL_NORMAL, SND_CHANGEVOL, SNDVOL_NORMAL);
-		EmitSoundToAll(frGhostBreathSound, client, SNDCHAN_USER_BASE, SNDLEVEL_NORMAL, SND_STOPLOOPING);
+		EmitSoundToAll(frGhostBreathSound, client, SNDCHAN_BODY, SNDLEVEL_NORMAL, SND_CHANGEVOL, 0.9);
 		CreateTimer((GetConVarFloat(cvFrBreathSound) / 2), Timer_StopBSound, GetClientUserId(client), TIMER_FLAG_NO_MAPCHANGE);
 	}
+	return Plugin_Continue;
 }
 public Action Timer_StopBSound(Handle timer, any userid)
 {
 	int client = GetClientOfUserId(userid);
-	float pos[3];
-	GetEntPropVector(client, Prop_Send, "m_vecOrigin", pos);
-	EmitAmbientSound(frGhostBreathSound, pos, client, SNDLEVEL_NORMAL, SND_STOPLOOPING);
+	EmitSoundToAll(frGhostBreathSound, client, SNDCHAN_BODY, SNDLEVEL_NORMAL, SND_STOPLOOPING);
+	return Plugin_Continue;
 }
 
 bool IsEntitySolid(int entity)
@@ -179,4 +173,5 @@ public Action FadeClient(int client, int r, int g, int b, int a)
 		BfWriteByte(hFadeClient, a);		
 	}
 	EndMessage();
+	return Plugin_Continue;
 }

@@ -3,11 +3,11 @@ KeyValues Kv;
 
 //Timers
 Handle frSpeedChange = INVALID_HANDLE;
-Handle frC4Bounce[MAXENTITIES + 1] = INVALID_HANDLE;
+Handle frC4Bounce[MAXENTITIES + 1];
 Handle frHideHud = INVALID_HANDLE;
 Handle frThirdperson = INVALID_HANDLE;
 Handle frHealthLeak = INVALID_HANDLE;
-Handle frChickenEating[MAXPLAYERS + 1] = INVALID_HANDLE;
+Handle frChickenEating[MAXPLAYERS + 1];
 Handle frTimerMoney = INVALID_HANDLE;
 Handle frBossEvolve = INVALID_HANDLE;
 Handle frCheckMoving = INVALID_HANDLE;
@@ -15,7 +15,7 @@ Handle frCheckMoving = INVALID_HANDLE;
 //Rounds
 int INTRoundNumber;
 int INTLastRoundNumber;
-int frTKs[MAXPLAYERS + 1] = 0;
+int frTKs[MAXPLAYERS + 1];
 char KeyValuePath[PLATFORM_MAX_PATH];
 char RoundNumber[3];
 char RoundName[200];
@@ -47,7 +47,7 @@ char BackWards[3];
 char SpeedChange[10];
 char PColor[15];
 char RecoilView[7];
-char Friction[3];
+char Friction[10];
 char BombTime[7] = "60";
 char FFF[3];
 char Chicken[3];
@@ -93,7 +93,7 @@ char AutoRespawn[10];
 char BattleRoyale[10];
 
 char LastRoundName[200] = "FunRounds!";
-bool RoundNumbers[200] = false;
+bool RoundNumbers[200];
 int RoundCounts = 0;
 
 void BuildRounds()
@@ -290,6 +290,7 @@ void CreateRound(bool force = false)
 public Action Timer_PreStart(Handle timer)
 {
 	PreStart();
+	return Plugin_Continue;
 }
 void PreStart()
 {
@@ -334,11 +335,6 @@ void StartRound()
 	//Chrono
 	if (StrEqual(Chrono, "1"))
 		ChronoStatus(true);
-	//FastWeaponSwitch
-	if (StrEqual(FastWeaponSwitch, "1"))
-		bFWS = true;
-	else
-		bFWS = false;
 	//ThirdPerson
 	if (StrEqual(ThirdPerson, "1"))
 		EnableThirdPerson();
@@ -469,17 +465,15 @@ void StartRound()
 		TimerMoneyCheck();
 	//BossEvolve
 	if (!StrEqual(BossEvolve, "0"))
-	{
-		bBossEvolve = true;
-		KillTimerHandle(frBossEvolve);
-		frBossEvolve = CreateTimer(5.0, Timer_BossEvolveGiveHealth, _, TIMER_REPEAT);
-	}
+		BossEvolveStatus(true);
 	//AutoRespawn Check
 	if (!StrEqual(AutoRespawn, "0;0"))
 		RespawnCheck();
 	//BattleRoyale Mai Editon
 	if (!StrEqual(BattleRoyale, "0"))
 		BRStart();
+	//FastWeaponSwitch
+	bFWS = StringToInt(FastWeaponSwitch) == 1;
 	for (int client = 1; client <= MaxClients; ++client)
 	{
 		if (IsValidClient(client))
@@ -513,12 +507,12 @@ void StartRound()
 			//GrappleHook
 			if (!StrEqual(GrappleHook, "0"))
 			{
-				SetGrappleHook(client);
+				SetGrappleHook(client, true);
 			}
 			//ThrowKnife
 			if (bThrowKnife || !StrEqual(ThrowKnife, "0") || CheckBoss(client))
 			{
-				SetThrowKnife(client);
+				ThrowKnifeStatus(client, true);
 			}
 			if (bAimbot || !StrEqual(Aimbot, "0"))
 			{
@@ -539,7 +533,7 @@ void StartRound()
 	if (!StrEqual(Health, "random") && !bSpeedChange)
 	{
 		KillTimerHandle(frHealthLeak);
-		frHealthLeak = CreateTimer(5.0, Timer_HealthLeak, _, TIMER_REPEAT);
+		frHealthLeak = CreateTimer(2.0, Timer_HealthLeak, _, TIMER_REPEAT);
 	}
 	//BossMode
 	if (!StrEqual(BossMode, "0"))
@@ -678,12 +672,12 @@ void TurnOffAllSettings()
 	//TimerMoney
 	KillTimerHandle(frTimerMoney);
 	//BossEvolve
-	bBossEvolve = false;
-	KillTimerHandle(frBossEvolve);
+	BossEvolveStatus(false);
 	
-	//BossMode, Zombie Mode
+	//BossMode
 	RestorePlayersTeam();
 	DisableRespawn();
+	FrBossEnd();
 	
 	//BattleRoyale
 	KillTimerHandle(frCheckMoving);
@@ -712,14 +706,13 @@ void TurnOffAllSettings()
 		//ExplodeBullet
 		SetExplodeClient(client);
 		ClearChickenTimer(client);
-		RemoveBoss(client);
-		RemoveThrowKnife(client);
+		SetBossStatus(client, false);
+		ThrowKnifeStatus(client, false);
 		SetCheats(client, false);
 	}
 	for (int entitys = 0; entitys <= MAXENTITIES; ++entitys)
 	{
 		KillTimerHandle(frC4Bounce[entitys]);
-		botweapon[entitys] = false;
 	}
 }
 void TurnOffRounds()
@@ -803,6 +796,7 @@ public Action Timer_RespawnPlayers(Handle timer)
 		if (IsValidClient(client) && GetClientTeam(client) > 1)
 			CS_RespawnPlayer(client);
 	}
+	return Plugin_Continue;
 }
 
 float GetPlantTime()
@@ -840,19 +834,21 @@ void SetDefuseTime(int client, int c4)
 public Action Timer_Plant(Handle timer, any userid)
 {
 	int client = GetClientOfUserId(userid);
-	if (!IsPlayerAlive(client)) return;
+	if (!IsPlayerAlive(client)) return Plugin_Stop;
 	int c4 = GetEntPropEnt(client, Prop_Send, "m_hActiveWeapon");
 	char weapon[64];
 	GetEntityClassname(c4, weapon, sizeof(weapon));
 	if (StrEqual(weapon, "weapon_c4"))
 		SetPlantTime(client, c4);
+	return Plugin_Continue;
 }
 public Action Timer_Defuse(Handle timer, any userid)
 {
 	int client = GetClientOfUserId(userid);
-	if (!IsPlayerAlive(client)) return;
+	if (!IsPlayerAlive(client)) return Plugin_Stop;
 	int c4 = FindEntityByClassname(MaxClients + 1, "planted_c4");
 	SetDefuseTime(client, c4);
+	return Plugin_Continue;
 }
 void SetBombTimer(int c4)
 {
@@ -862,7 +858,7 @@ void SetBombTimer(int c4)
 
 void SetRecoil(int value)
 {
-	switch(value)
+	switch (value)
 	{
 		case 0:
 		{

@@ -51,7 +51,7 @@ stock bool RemoveWeaponBySlot(int client, int slot)
 	return false;
 }
 
-stock bool SetActiveWeapon(int client, int weapon)
+stock void SetActiveWeapon(int client, int weapon)
 {
 	SetEntPropEnt(client, Prop_Data, "m_hActiveWeapon", weapon);
 	ChangeEdictState(client, FindDataMapInfo(client, "m_hActiveWeapon"));
@@ -81,12 +81,12 @@ stock void SetCvar(char[] scvar, char[] svalue, bool hide = true)
 }
 stock void DisarmPlayerWeapons(int client)
 {
-	for(int i = 0; i < 14; ++i)
+	for (int i = 0; i < 14; ++i)
 	{
 		int weapon = -1;
 		while ((weapon = GetPlayerWeaponSlot(client, i)) != -1)
 		{
-			if(IsValidEntity(weapon))
+			if (IsValidEntity(weapon))
 			{
 				RemovePlayerItem(client, weapon);
 				AcceptEntityInput(weapon, "Kill");
@@ -159,7 +159,6 @@ stock void SetMoney(int client, int money)
 	if (IsValidClient(client))
 	{
 		SetEntData(client, FindSendPropInfo("CCSPlayer", "m_iAccount"), money);
-		SetEntData(client, FindSendPropInfo("CCSPlayer", "m_iStartAccount"), money);
 	}
 }
 stock bool HasWeapon(int client, const char[] classname)
@@ -261,7 +260,7 @@ bool Base_TraceFilter(int entity, int contentsMask, int iData)
 stock bool PlayerIsEnemy(int client, int target)
 {
 	ConVar cvar = FindConVar("mp_teammates_are_enemies");
-	if (GetConVarBool(cvar)) return true;
+	if (cvar.BoolValue) return true;
 	if (GetClientTeam(client) != GetClientTeam(target)) return true;
 	return false;
 }
@@ -328,8 +327,7 @@ stock int GetWinner(int reason)
 stock void SendCvar(int client, char[] scvar, char[] svalue)
 {
 	ConVar cvar = FindConVar(scvar);
-	//cvar.ReplicateToClient(client, svalue);
-	SendConVarValue(client, cvar, svalue);
+	cvar.ReplicateToClient(client, svalue);
 	cvar.Close();
 }
 
@@ -357,13 +355,14 @@ stock char[] GetCvarString(char[] scvar)
 	return buffer;
 }
 
-stock void KillTimerHandle(Handle &timer)
+stock bool KillTimerHandle(Handle &timer)
 {
 	if (timer != INVALID_HANDLE)
 	{
 		KillTimer(timer);
 		timer = INVALID_HANDLE;
 	}
+	return true;
 }
 
 stock bool IsPlayerHasHelmet(int client)
@@ -387,7 +386,36 @@ stock bool IsMoveButtonsPressed(int buttons)
 	return buttons & IN_FORWARD || buttons & IN_BACK || buttons & IN_MOVELEFT || buttons & IN_MOVERIGHT;
 }
 
-bool IsPlayerAttacking(int buttons)
+stock bool IsPlayerAttacking(int buttons)
 {
 	return buttons & IN_ATTACK || buttons & IN_ATTACK2 || buttons & IN_ATTACK3 || buttons & IN_RELOAD || buttons & IN_USE;
+}
+
+stock int ReplacePlayerWeapon(const int client, const int slot, const char[] classname)
+{
+	int weapon = GetPlayerWeaponSlot(client, slot);
+
+	if (IsValidEntity(weapon))
+	{
+		if (GetEntPropEnt(weapon, Prop_Send, "m_hOwnerEntity") != client)
+			SetEntPropEnt(weapon, Prop_Send, "m_hOwnerEntity", client);
+
+		CS_DropWeapon(client, weapon, false, true);
+	}
+
+	weapon = GivePlayerItem(client, classname);
+
+	if (IsValidEntity(weapon))
+		EquipPlayerWeapon(client, weapon);
+
+	return weapon;
+}
+
+stock char[] GetActiveWeaponClassname(int client)
+{
+	char classname[64];
+	int weapon = CSGOItems_GetActiveWeapon(client);//GetEntPropEnt(client, Prop_Data, "m_hActiveWeapon");
+	if (IsValidEntity(weapon))
+		GetEntityClassname(weapon, classname, sizeof(classname));
+	return classname;
 }

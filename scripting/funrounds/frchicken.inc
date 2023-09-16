@@ -12,16 +12,15 @@ int frCweapons[MAXPLAYERS];
 int frChickenNumber;
 
 bool frIsChicken[MAXPLAYERS + 1];
-bool frCWasIdle[MAXPLAYERS + 1] = false;
-bool frCWasRunning[MAXPLAYERS + 1] = false;
-bool frCIsWalking[MAXPLAYERS + 1] = false;
-bool frCWasWalking[MAXPLAYERS + 1] = false;
-bool frCIsMoving[MAXPLAYERS + 1] = false;
-bool frChickenSpawnOrigin = false;
-bool frChickenSoundCD[MAXPLAYERS + 1] = false;
+bool frCWasIdle[MAXPLAYERS + 1];
+bool frCWasRunning[MAXPLAYERS + 1];
+bool frCIsWalking[MAXPLAYERS + 1];
+bool frCWasWalking[MAXPLAYERS + 1];
+bool frCIsMoving[MAXPLAYERS + 1];
+bool frChickenSpawnOrigin;
+bool frChickenSoundCD[MAXPLAYERS + 1];
 
-Handle frAnimationsTimer[MAXPLAYERS + 1];
-Handle frFeathersTimer[MAXPLAYERS + 1];
+static Handle frAnimationsTimer[MAXPLAYERS + 1];
 
 char frPlayersModels[MAXPLAYERS + 1][PLATFORM_MAX_PATH];
 const float frChickenRunSpeed = 102.0;
@@ -187,8 +186,7 @@ void ChickenDeath(int client)
 	DispatchSpawn(frFeathersParticles[client]);
 	ActivateEntity(frFeathersParticles[client]);
 	AcceptEntityInput(frFeathersParticles[client], "Start");
-	KillTimerHandle(frFeathersTimer[client]);
-	frFeathersTimer[client] = CreateTimer(3.0, Timer_DestroyParticles, GetClientUserId(client));
+	CreateTimer(3.0, Timer_DestroyParticles, GetClientUserId(client));
 }
 /* move visible like ghost mode
 void SetRotationLock(int client, bool enabled)
@@ -324,17 +322,18 @@ public Action Timer_ChickenAnim(Handle timer, any userid)
 		}
 		frLastFlags[client] = currentFlags;
 	}
+	return Plugin_Continue;
 }
 
 public Action Timer_DestroyParticles(Handle timer, any userid)
 {
 	int client = GetClientOfUserId(userid);
-	if (frFeathersTimer[client] == timer && IsValidEdict(frFeathersParticles[client]))
+	if (IsValidEdict(frFeathersParticles[client]))
 	{
 		AcceptEntityInput(frFeathersParticles[client], "Deactivate");
 		AcceptEntityInput(frFeathersParticles[client], "Kill" );
 	}
-	return Plugin_Handled;
+	return Plugin_Continue;
 }
 public void SpawnChickens()
 {
@@ -408,6 +407,7 @@ public bool TRDontHitSelf(int entity, int mask, any data)
 public Action Timer_RemoveChicken(Handle timer)
 {
 	RemoveChickens();
+	return Plugin_Continue;
 }
 public void RemoveChickens()
 {
@@ -454,6 +454,7 @@ public Action Timer_ChickenSoundCD(Handle timer, any userid)
 {
 	int client = GetClientOfUserId(userid);
 	frChickenSoundCD[client] = false;
+	return Plugin_Continue;
 }
 void SetViewModel(int client, bool enabled)
 {
@@ -488,4 +489,56 @@ int CalcPlayers()
 	num *= 2;
 	if (num < 10) num = 10;
 	return num;
+}
+
+void KillChickenTimers(int client)
+{
+	KillTimerHandle(frAnimationsTimer[client]);
+}
+
+public Action Timer_EatingChicken(Handle timer, any userid)
+{
+	int client = GetClientOfUserId(userid);
+	if (IsValidClient(client) && IsPlayerAlive(client))
+	{
+		if (frAteChickenCount[client] > 0)
+		{
+			--frAteChickenCount[client];
+			if (frAteChickenCount[client] == 0)
+			{
+				frAteChicken[client] = false;
+				PrintToChat(client, "[SM] \x3 \x4你饿了，想再吃一只鸡。");
+				RequestFrame(ClearChickenTimer, client);
+			}
+			else
+			{
+				PrintToChat(client, "[SM] \x3 \x4看起来你消化掉了一只鸡。");
+			}
+		}
+	}
+	return Plugin_Continue;
+}
+void ClearChickenTimer(int client)
+{
+	KillTimerHandle(frChickenEating[client]);
+}
+
+void EatChicken(int chicken, int client)
+{
+	AcceptEntityInput(chicken, "Deactivate");
+	AcceptEntityInput(chicken, "Kill");
+	frAteChicken[client] = true;
+	++frAteChickenCount[client];
+	
+	int clientHealth = GetHealth(client);
+	int CHealth = RoundToFloor(clientHealth + (clientHealth * GetRandomFloat(0.70, 2.75) / frAteChickenCount[client]));
+	if (!StrEqual(Health, "random"))
+	{
+		int BaseHealth = StringToInt(Health);
+		if (clientHealth < BaseHealth && CHealth < BaseHealth)
+			CHealth = BaseHealth;
+	}
+	if (GetHealth(client) < 25 && CHealth < 25) CHealth = 25;
+	PrintToChat(client, "[SM] \x3 \x4好吃！吃鸡恢复了 %i 血", CHealth - clientHealth);
+	SetHealth(client, CHealth);
 }

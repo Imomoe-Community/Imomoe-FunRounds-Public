@@ -1,11 +1,11 @@
 char frWeapons[57][21] =  { "weapon_ak47", "weapon_aug", "weapon_bizon", "weapon_famas", "weapon_g3sg1", "weapon_galilar", "weapon_m249", "weapon_m4a1", "weapon_mac10", "weapon_mag7", "weapon_mp7", "weapon_mp9", "weapon_negev", "weapon_nova", "weapon_p90", "weapon_sawedoff", "weapon_scar20", "weapon_sg556", "weapon_ssg08", "weapon_ump45", "weapon_xm1014", "weapon_awp", "weapon_m4a1_silencer", "weapon_mp5sd", "weapon_deagle", "weapon_elite", "weapon_fiveseven", "weapon_glock", "weapon_hkp2000", "weapon_p250", "weapon_tec9", "weapon_usp_silencer", "weapon_cz75a", "weapon_revolver", "weapon_shield", "weapon_healthshot", "weapon_breachcharge", "weapon_tablet", "weapon_c4", "weapon_taser", "weapon_hegrenade", "weapon_incgrenade", "weapon_flashbang", "weapon_molotov", "weapon_smokegrenade", "weapon_decoy", "weapon_firebomb", "weapon_diversion", "weapon_bumpmine", "weapon_tagrenade", "weapon_snowball", "weapon_knifegg", "weapon_fists", "weapon_axe", "weapon_hammer", "weapon_spanner", "chicken" };
 
-char frBuyMenuWeapons[37][] =  { "glock", "hkp2000", "usp_silencer", "elite", "p250", "tec9", "fn57", "deagle", "galilar", "famas", "ak47", "m4a1", "m4a1_silencer", "ssg08", "aug", "sg556", "awp", "scar20", "g3sg1", "nova", "xm1014", "mag7", "m249", "negev", "mac10", "mp9", "mp7", "ump45", "p90", "bizon", "taser", "molotov", "incgrenade", "decoy", "flashbang", "hegrenade", "smokegrenade" };
+char frBuyMenuWeapons[38][] =  { "glock", "hkp2000", "usp_silencer", "elite", "p250", "tec9", "fn57", "deagle", "galilar", "famas", "ak47", "m4a1", "m4a1_silencer", "ssg08", "aug", "sg556", "awp", "scar20", "g3sg1", "nova", "xm1014", "mag7", "sawedoff", "m249", "negev", "mac10", "mp9", "mp7", "ump45", "p90", "bizon", "taser", "molotov", "incgrenade", "decoy", "flashbang", "hegrenade", "smokegrenade" };
 
 float g_fLastAngles[MAXPLAYERS + 1][3];
-bool frPlayerWeaponFired[MAXPLAYERS + 1] = false;
-bool frExplodeBulletClient[MAXPLAYERS + 1] = false;
-int CurrentRoundWeapon[3] = -1;
+bool frPlayerWeaponFired[MAXPLAYERS + 1];
+static bool frExplodeBulletClient[MAXPLAYERS + 1];
+int CurrentRoundWeapon[3];
 
 void EquipRandomWeapon(int client, int count = 1, bool force = false)
 {
@@ -90,6 +90,7 @@ public Action Timer_TeslaRechange(Handle timer, any userid)
 {
 	int client = GetClientOfUserId(userid);
 	frPlayerWeaponFired[client] = false;
+	return Plugin_Continue;
 }
 
 void FireTeslaBullet(int client, float pos[3])
@@ -162,6 +163,7 @@ public Action Timer_ExplosiveRechange(Handle timer, any userid)
 {
 	int client = GetClientOfUserId(userid);
 	frExplodeBulletCD[client] = false;
+	return Plugin_Continue;
 }
 
 void CS_CreateExplosion(int client, int damage, int radius, float pos[3], const char[] classname)
@@ -191,7 +193,7 @@ void TriggerExplosion(int entity)
 }
 void GiveNade(int client)
 {
-	if (bInfNade)
+	if (bInfNade && IsValidClient(client) && IsPlayerAlive(client))
 		EquipPlayerWeapon(client, GivePlayerItem(client, InfNade));
 }
 
@@ -223,6 +225,7 @@ public Action Timer_GiveMoney(Handle timer, int money)
 			SetMoney(client, GetMoney(client) + money);
 		}
 	}
+	return Plugin_Continue;
 }
 
 void FR_GiveC4(int c4number)
@@ -276,6 +279,7 @@ public Action Timer_Bounce(Handle timer, int c4)
 		//TE_SetupBeamFollow(c4, BeamIndex, 0, 0.8, 1.0, 1.0, 1, Red);
 		//TE_SendToAll();
 	}
+	return Plugin_Continue;
 }
 
 void Weapon_Random(const int array, const int index, const int team)
@@ -296,7 +300,7 @@ void GiveRoundWeapon(const int client, const int arrayNum, const int index)
 		return;
 	if (index < 0)
 		return;
-	switch(arrayNum)
+	switch (arrayNum)
 	{
 		case 0:
 		{
@@ -333,4 +337,8 @@ void ClearRoundWeapon()
 	{
 		CurrentRoundWeapon[i] = -1;
 	}
+}
+bool IsExplodingBulletClient(int client)
+{
+	return frExplodeBulletClient[client];
 }

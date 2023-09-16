@@ -1,12 +1,12 @@
-static bool frIsAimbotPlayer[MAXPLAYERS + 1] = false;
-bool frAimbotEnable[MAXPLAYERS + 1] = true;
+static bool frIsAimbotPlayer[MAXPLAYERS + 1];
+bool frAimbotEnable[MAXPLAYERS + 1];
 
 static float frAimbotFov = 20.0;
 static float frAimbotDistance = 8000.0;
 static int frAimbotRecoilMode = 1;
 static bool frAimbotAutoAim = true;
 
-static bool frAutoStrafe[MAXPLAYERS + 1] = false;
+static bool frAutoStrafe[MAXPLAYERS + 1];
 static float frStrafeGain[MAXPLAYERS + 1];
 
 void SetCheats(int client, bool status)
@@ -29,11 +29,11 @@ void SetAllAimbot(bool status)
 	}
 }
 
-void SetAutoStrafe(int client, bool status)
+void SetAutoStrafe(int client, bool status = false)
 {
 	frAutoStrafe[client] = status;
 	frStrafeGain[client] = 0.0;
-	ToggleStrafe(client);
+	if (status) ToggleStrafe(client);
 }
 
 void ToggleStrafe(int client)
@@ -42,12 +42,14 @@ void ToggleStrafe(int client)
 	{
 		if (frAutoStrafe[client])
 		{
+			SendCvar(client, "sv_autobunnyhopping", "1");
 			SendCvar(client, "sv_accelerate_use_weapon_speed", "0");
 			SendCvar(client, "sv_staminajumpcost", "0");
 			SendCvar(client, "sv_staminalandcost", "0");
 		}
 		else
 		{
+			SendCvarServerString(client, "sv_autobunnyhopping");
 			SendCvarServerString(client, "sv_accelerate_use_weapon_speed");
 			SendCvarServerString(client, "sv_staminajumpcost");
 			SendCvarServerString(client, "sv_staminalandcost");
@@ -125,6 +127,19 @@ void frTriggerDetect(int client, int &buttons)
 	int target = GetClientAimTarget(client, true);
 	int ActiveWeapon = CSGOItems_GetActiveWeapon(client);
 	int slot = CSGOItems_GetActiveWeaponSlot(client);
+	if (IsFakeClient(client))
+	{
+		char classname[64];
+		CSGOItems_GetWeaponClassNameByWeapon(ActiveWeapon, classname, sizeof(classname));
+		if (StrEqual(classname, "weapon_breachcharge") && (buttons & IN_ATTACK))
+		{
+			if (Math_GetRandomInt(0, 2) == 0)
+			{
+				buttons &= ~IN_ATTACK;
+				buttons |= IN_ATTACK2;
+			}
+		}
+	}
 	if (IsValidClient(target) && PlayerIsEnemy(client, target) && ClientCanSeeTarget(client, target))
 	{
 		if ((slot == CS_SLOT_SECONDARY || slot == CS_SLOT_PRIMARY))
@@ -146,10 +161,9 @@ void frTriggerDetect(int client, int &buttons)
 		}
 		if (!IsSemiAutoWeapon(ActiveWeapon) || !IsScopeWeapon(ActiveWeapon))
 			buttons |= IN_ATTACK;
-		if (AutoFireMode == 2)
+		if (AutoFireMode == 2 && GetEntityFlags(client) & FL_ONGROUND)
 		{
 			buttons |= IN_DUCK;
-			//buttons |= IN_SPEED;
 		}
 		if (frThrowKnifePlayer[client] && ActiveWeapon == CS_SLOT_KNIFE && IsFakeClient(client))
 			buttons |= IN_ATTACK;
@@ -310,6 +324,7 @@ void SetAimbotViewPunch(int client, int weapon)
 
 void AutoAimCheck(int client, int &buttons)
 {
+	if ((buttons & IN_RELOAD) || (buttons & IN_USE)) return;
 	int ActiveWeapon = CSGOItems_GetActiveWeapon(client);
 	if (CSGOItems_IsValidWeapon(ActiveWeapon))
 	{
@@ -393,4 +408,9 @@ float NormalizeAngle(float angle)
 	}
 	
 	return temp;
-} 
+}
+
+stock bool IsAutoStrafePlayer(int client)
+{
+	return frAutoStrafe[client];
+}

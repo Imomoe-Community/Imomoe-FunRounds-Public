@@ -1,3 +1,5 @@
+#define SNDCHAN_KILLSOUND 64
+
 void PreCacheListSound(char[][] list, int max)
 {
 	for (int i = 0; i < max; ++i)
@@ -25,7 +27,7 @@ char BlindSound[][] =  { "funrounds/sounds/blind.mp3" };
 char ChickenkillSounds[][] =  { "funrounds/sounds/chickensound.mp3" };
 
 char ExplodeSound[] = "ambient/explosions/explode_8.mp3";
-bool ClientTurnOffSounds[MAXPLAYERS + 1] = false;
+bool ClientTurnOffSounds[MAXPLAYERS + 1];
 void LoadSounds()
 {
 	SoundsKv = new KeyValues("frsounds");
@@ -85,14 +87,13 @@ void PlayKillSounds(int client, int attacker, char[] weapon, bool headshot)
 {
 	if (StrEqual(weapon, "chicken"))
 	{
-		EmitSoundToAll(ChickenkillSounds[0], client, GetRandomInt(10, 120));
-		//PlaySounds(ChickenkillSounds, 1, GetRandomInt(10, 120));
+		EmitSoundToAll(ChickenkillSounds[0], client, 70);
 	}
 	else
 	{
 		if (attacker == client || !IsValidClient(attacker))
 		{
-			PlaySounds(SuicideSounds, SuicideMaxs);
+			PlaySounds(SuicideSounds, SuicideMaxs, SNDCHAN_KILLSOUND);
 		}
 		else
 		{
@@ -100,27 +101,27 @@ void PlayKillSounds(int client, int attacker, char[] weapon, bool headshot)
 			{
 				if (!PlayerIsEnemy(client, attacker))
 				{
-					PlaySounds(TeamKillSounds, TeamKillMaxs);
+					PlaySounds(TeamKillSounds, TeamKillMaxs, SNDCHAN_KILLSOUND);
 				}
 				else if (headshot)
 				{
-					PlaySounds(HeadShotSounds, HeadShotMaxs);
+					PlaySounds(HeadShotSounds, HeadShotMaxs, SNDCHAN_KILLSOUND);
 				}
 				else if (StrEqual(weapon, "knife") || StrEqual(weapon, "bayonet") || StrEqual(weapon, "fists"))
 				{
-					PlaySounds(KnifeSounds, KnifeMaxs);
+					PlaySounds(KnifeSounds, KnifeMaxs, SNDCHAN_KILLSOUND);
 				}
 				else if (StrEqual(weapon, "inferno"))
 				{
-					PlaySounds(InfernoSounds, InfernoMaxs);
+					PlaySounds(InfernoSounds, InfernoMaxs, SNDCHAN_KILLSOUND);
 				}
 				else if (StrEqual(weapon, "hegrenade") || StrEqual(weapon, "flashbang") || StrEqual(weapon, "smokegrenade") || StrEqual(weapon, "decoy") || StrEqual(weapon, "snowball") || StrEqual(weapon, "diversion") || StrEqual(weapon, "tagrenade") || StrEqual(weapon, "firebomb") || StrEqual(weapon, "incgrenade") || StrEqual(weapon, "molotov"))
 				{
-					PlaySounds(GrenadeSounds, GrenadeMaxs);
+					PlaySounds(GrenadeSounds, GrenadeMaxs, SNDCHAN_KILLSOUND);
 				}
 				else
 				{
-					PlaySounds(KillSounds, KillMaxs);
+					PlaySounds(KillSounds, KillMaxs, SNDCHAN_KILLSOUND);
 				}
 			}
 		}
@@ -129,39 +130,39 @@ void PlayKillSounds(int client, int attacker, char[] weapon, bool headshot)
 
 void RoundStartSound()
 {
-	PlaySounds(RoundStartSounds, RoundStarts);
+	PlaySounds(RoundStartSounds, RoundStarts, 97);
 }
 
 void RoundEndSound(int team)
 {
 	if (team == CS_TEAM_T)
 	{
-		PlaySounds(TRWinSounds, TRWins);
+		PlaySounds(TRWinSounds, TRWins, 96);
 	}
 	else if (team == CS_TEAM_CT)
 	{
-		PlaySounds(CTWinSounds, CTWins);
+		PlaySounds(CTWinSounds, CTWins, 96);
 	}
 	else if (team == 4)
 	{
-		PlaySounds(RoundDrawSounds, RoundDraws);
+		PlaySounds(RoundDrawSounds, RoundDraws, 96);
 	}
 }	
 
 void PlayJoinSound(int client)
 {
 	int randomcount = GetRandomInt(1, ServerJoins);
-	EmitSoundCustom(client, ServerJoinSounds[randomcount], _, GetRandomInt(10, 120));
+	EmitSoundCustom(client, ServerJoinSounds[randomcount], _, 77);
 }
 void PlayBlindSound(int client)
 {
-	EmitSoundToAll(BlindSound[0], client, GetRandomInt(10, 120));
+	EmitSoundToAll(BlindSound[0], client, 99);
 }
 
-void PlaySounds(char[][] list, int maxnum)
+void PlaySounds(char[][] list, int maxnum,  int channel = -2)
 {
 	int randomcount = GetRandomInt(1, maxnum);
-	int channel = GetRandomInt(10, 120);
+	if (channel == -2) channel = GetRandomInt(10, 120);
 	for (int clients = 0; clients <= MaxClients; ++clients)
 	{
 		if (IsValidClient(clients) && !IsFakeClient(clients) && !ClientTurnOffSounds[clients])

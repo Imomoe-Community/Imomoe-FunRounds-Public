@@ -1,77 +1,99 @@
 #define BEAMMODEL "materials/sprites/purplelaser1.vmt"
-static bool frIsBossPlayer[MAXPLAYERS + 1] = false;
-bool frIsPlayerCanHook[MAXPLAYERS + 1] = false;
+static bool frIsBossPlayer[MAXPLAYERS + 1];
+bool frIsPlayerCanHook[MAXPLAYERS + 1];
 bool frIsHooked[MAXPLAYERS + 1];
 int frHookEnt[MAXPLAYERS + 1] =  { INVALID_ENT_REFERENCE, ... };
 int frHookProp[MAXPLAYERS + 1] =  { INVALID_ENT_REFERENCE, ... };
 float frHookLength[MAXPLAYERS + 1];
 float frHookPos[MAXPLAYERS + 1][3];
-static char HookSound[] =  { "funrounds/boss/hook.mp3" };
+static char HookSound[] = "funrounds/boss/hook.mp3";
 static bool IsBossPlayerAlive = false;
-static bool IsRandomDamageEnable;
+static bool RandomDamageStatus;
+static int LatestBossPlayer = -1;
+
 void FrBossStart()
 {
 	PreCacheSoundAndDownload(HookSound);
 	PrecacheModel(BEAMMODEL);
 }
 
+void FrBossEnd()
+{
+	RandomDamageStatus = false;
+	IsBossPlayerAlive = false;
+	LatestBossPlayer = -1;
+	for (int client = 1; client <= MaxClients; ++client)
+	{
+		frIsBossPlayer[client] = false;
+		frIsHooked[client] = false;
+	}
+}
+
 bool CheckBoss(int client)
 {
 	return frIsBossPlayer[client];
 }
-void SetBoss(int client)
+void SetBossStatus(int client, bool status)
 {
-	if (client != -1)
+	if (IsValidClient(client))
 	{
-		SetEntData(client, FindSendPropInfo("CCSPlayer", "m_bCanMoveDuringFreezePeriod"), 1);
-		frIsBossPlayer[client] = true;
-		int random = Math_GetRandomInt(1, 100);
-		if (random <= 20)
+		frIsBossPlayer[client] = status;
+		if (status && IsPlayerAlive(client))
 		{
-			SetGrappleHook(client);
-		}
-		else if (20 < random <= 40)
-		{
-			SetEntityGravity(client, 0.3);
-		}
-		else if (40 < random <= 60)
-		{
-			SetSpeed(client, 2.0);
-		}
-		else if (60 < random <= 80)
-		{
-			SetPlayerGhost(client);
-			SetThrowKnife(client);
-			SetAutoStrafe(client, true);
+			SetEntData(client, FindSendPropInfo("CCSPlayer", "m_bCanMoveDuringFreezePeriod"), 1);
+			int random = Math_GetRandomInt(1, 100);
+			if (random <= 20)
+			{
+				PrintToChat(client, "[SM] 您的BOSS技能为：抓钩");
+				SetGrappleHook(client, status);
+			}
+			else if (20 < random <= 40)
+			{
+				frPlayerDamageMultiplier[client] = 5.0;
+				PrintToChat(client, "[SM] 您的BOSS技能为：五倍伤害");
+			}
+			else if (40 < random <= 60)
+			{
+				SetSpeed(client, 2.0);
+				PrintToChat(client, "[SM] 您的BOSS技能为：两倍速");
+			}
+			else if (60 < random <= 80)
+			{
+				PlayerGhostStatus(client, status);
+				ThrowKnifeStatus(client, status);
+				SetAutoStrafe(client, status);
+				SetEntityGravity(client, 0.3);
+				PrintToChat(client, "[SM] 您的BOSS技能为：低重力幽灵加飞刀");
+			}
+			else
+			{
+				SetExplodeClient(client, status);
+				PrintToChat(client, "[SM] 您的BOSS技能为：子弹爆炸");
+			}
 		}
 		else
 		{
-			SetExplodeClient(client, true);
+			frIsPlayerCanHook[client] = status;
+			SetGrappleHook(client, status);
+			if (IsValidClient(client))
+			{
+				SetSpeed(client, 1.0);
+				SetEntityGravity(client, 1.0);
+			}
+			SetAutoStrafe(client, status);
+			PlayerGhostStatus(client, status);
+			ThrowKnifeStatus(client, status);
+			SetExplodeClient(client);
+			frPlayerDamageMultiplier[client] = 1.0;
 		}
 	}
 }
 
-void SetGrappleHook(int client)
+void SetGrappleHook(int client, bool status)
 {
-	frIsPlayerCanHook[client] = true;
+	frIsPlayerCanHook[client] = status;
 	GrappleHookOff(client);
-	if (!StrEqual(GrappleHook, "0") || !StrEqual(BossEvolve, "0")) PrintToChat(client, "[SM] 您可以按E键使用抓钩");
-}
-
-void RemoveBoss(int client)
-{
-	frIsBossPlayer[client] = false;
-	frIsPlayerCanHook[client] = false;
-	GrappleHookOff(client);
-	if (IsValidClient(client))
-	{
-		SetSpeed(client, 1.0);
-		SetEntityGravity(client, 1.0);
-	}
-	SetAutoStrafe(client, false);
-	RemovePlayerGhost(client);
-	RemoveThrowKnife(client);
-	SetExplodeClient(client, false);
+	if ((!StrEqual(GrappleHook, "0") || !StrEqual(BossEvolve, "0")) && status) PrintToChat(client, "[SM] 您可以按E键使用抓钩");
 }
 
 void Knockback(int client, float value)
@@ -89,25 +111,7 @@ void Knockback(int client, float value)
 	}
 }
 
-void EatChicken(int chicken, int client)
-{
-	AcceptEntityInput(chicken, "Deactivate");
-	AcceptEntityInput(chicken, "Kill");
-	frAteChicken[client] = true;
-	++frAteChickenCount[client];
-	
-	int clientHealth = GetHealth(client);
-	int CHealth = RoundToFloor(clientHealth + (clientHealth * GetRandomFloat(0.75, 3.0) / frAteChickenCount[client]));
-	if (!StrEqual(Health, "random"))
-	{
-		int BaseHealth = StringToInt(Health);
-		if (clientHealth < BaseHealth && CHealth < BaseHealth)
-			CHealth = BaseHealth;
-	}
-	if (GetHealth(client) < 25 && CHealth < 25) CHealth = 25;
-	PrintToChat(client, "[SM] \x3 \x4好吃！吃鸡恢复了 %i 血", CHealth - clientHealth);
-	SetHealth(client, CHealth);
-}
+
 void GrappleHookAction(int client)
 {
 	if (IsValidClient(client) && IsPlayerAlive(client))
@@ -261,22 +265,30 @@ public Action Timer_BossEvolveGiveHealth(Handle timer)
 void EvolveBoss()
 {
 	int boss = -1;
-	int hp[MAXPLAYERS + 1] = 0;
+	int hp[MAXPLAYERS + 1];
 	for (int client = 1; client <= MaxClients; ++client)
 	{
-		RemoveBoss(client);
 		if (IsValidClient(client) && IsPlayerAlive(client))
-		{
 			hp[client] = GetHealth(client);
-		}
 	}
 	boss = SelectHighestHealthPlayer(hp, sizeof(hp));
-	SetBoss(boss);
+	if (LatestBossPlayer != boss && boss > 0)
+	{
+		if (IsValidClient(boss) && IsPlayerAlive(boss))
+		{
+			if (IsValidClient(LatestBossPlayer)) SetBossStatus(LatestBossPlayer, false);
+			SetBossStatus(boss, true);
+			LatestBossPlayer = boss;
+		}
+	}
 	char name[64];
 	GetClientName(boss, name, sizeof(name));
 	int bosshealth = GetHealth(boss);
-	PrintToChatAll("[SM] 当前的BOSS玩家为：%s, 血量为：%i ", name, bosshealth);
-	IsRandomDamageEnable = bosshealth > 3000;
+	if (boss > 0)
+		PrintToChatAll("[SM] 当前的BOSS玩家为：%s, 血量为：%i ", name, bosshealth);
+	else
+		PrintToChatAll("[SM] 当前没有任何玩家成为BOSS");
+	RandomDamageStatus = bosshealth > 3000;
 }
 
 stock int SelectHighestHealthPlayer(const int[] array, const int maxlength)
@@ -328,7 +340,7 @@ void RandomSelectBoss(int count)
 
 void SetBossPlayer(int client)
 {
-	SetBoss(client);
+	SetBossStatus(client, true);
 	SetHealth(client, GetHealth(client) * 10);
 	SetArmorValue(client, GetArmorValue(client) * 4, true, true);
 }
@@ -351,7 +363,16 @@ void CheckBossAlive()
 	IsBossPlayerAlive = bossnum > 0;
 }
 
-bool RandomDamage()
+bool IsRandomDamageEnable()
 {
-	return IsRandomDamageEnable;
+	return RandomDamageStatus;
+}
+
+void BossEvolveStatus(bool status)
+{
+	bBossEvolve = status;
+	KillTimerHandle(frBossEvolve);
+	LatestBossPlayer = -1;
+	if (status)
+		frBossEvolve = CreateTimer(5.0, Timer_BossEvolveGiveHealth, _, TIMER_REPEAT);
 }

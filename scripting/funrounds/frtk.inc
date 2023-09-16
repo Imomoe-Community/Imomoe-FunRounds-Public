@@ -7,13 +7,13 @@
 #define TKVELOCITY 3500.0
 #define TKLIFE 2.5
 
-bool frThrowKnifePlayer[MAXPLAYERS + 1] = false;
+bool frThrowKnifePlayer[MAXPLAYERS + 1];
 
 int fkBeam = -1;
 int frKnifeModel = -1;
 
-float tkSpinValue[] =  { 4000.0, 0.0, 0.0 };
-float ThrowKnifeDamage[2] =  { 65.0, 180.0 };
+static float tkSpinValue[] =  { 4000.0, 0.0, 0.0 };
+static float ThrowKnifeDamage[2] =  { 80.0, 250.0 };
 
 
 void frThrowKnifeStart()
@@ -21,14 +21,9 @@ void frThrowKnifeStart()
 	fkBeam = PrecacheModel("effects/blueblacklargebeam.vmt");
 }
 
-void SetThrowKnife(int client)
+void ThrowKnifeStatus(int client, bool status = false)
 {
-	frThrowKnifePlayer[client] = true;
-}
-
-void RemoveThrowKnife(int client)
-{
-	frThrowKnifePlayer[client] = false;
+	frThrowKnifePlayer[client] = status;
 }
 
 void ThrowingKnife(int client)
@@ -41,6 +36,7 @@ void ThrowingKnife(int client)
 		SetEntPropEnt(tk, Prop_Send, "m_hOwnerEntity", client);
 		SetEntPropEnt(tk, Prop_Send, "m_hThrower", client);
 		SetEntProp(tk, Prop_Send, "m_iTeamNum", team);
+		DispatchKeyValue(tk, "classname", "weapon_knife_projectile");
 		
 		char tkmodel[PLATFORM_MAX_PATH];
 		GetEntPropString(knifeslot, Prop_Data, "m_ModelName", tkmodel, sizeof(tkmodel));
@@ -89,11 +85,12 @@ void ThrowingKnife(int client)
 
 public Action ThrowKnifeHit(int knife, int victim)
 {
-	if (IsValidClient(victim))
+	if (IsValidClient(victim) && IsPlayerAlive(victim))
 	{
 		SetVariantString("csblood");
 		AcceptEntityInput(knife, "DispatchEffect");
 		AcceptEntityInput(knife, "Kill");
+		SDKUnhook(knife, SDKHook_Touch, ThrowKnifeHit);
 		int attacker = GetEntPropEnt(knife, Prop_Send, "m_hThrower");
 		int inflictor = GetPlayerWeaponSlot(attacker, CS_SLOT_KNIFE);
 		if (inflictor == -1)
@@ -103,7 +100,7 @@ public Action ThrowKnifeHit(int knife, int victim)
 		GetEntPropVector(knife, Prop_Data, "m_vecOrigin", pos);
 		GetEntPropVector(knife, Prop_Data, "m_vecVelocity", vec);
 		GetClientEyePosition(victim, victimpos);
-		if (GetVectorLength(vec) > 0.0)
+		if (GetVectorLength(vec) != 0.0)
 		{
 			float distance = GetVectorDistance(pos, victimpos);
 			bool hs = (distance <= 18.0);
@@ -125,18 +122,35 @@ public Action ThrowKnifeHit(int knife, int victim)
 				SetEntPropVector(ragdoll, Prop_Send, "m_vecForce", vec);
 				SetEntPropVector(ragdoll, Prop_Send, "m_vecRagdollVelocity", vec);
 			}
-			
 		}
+		else return Plugin_Continue;
 	}
 	else
 	{
-		SDKUnhook(knife, SDKHook_Touch, ThrowKnifeHit);
-		float pos[3], dir[3];
-		GetEntPropVector(knife, Prop_Data, "m_vecOrigin", pos);
-		TE_SetupArmorRicochet(pos, dir);
-		TE_SendToAll(0.0);
+		char classname[64];
+		GetEntityClassname(victim, classname, sizeof(classname));
+		if (StrContains(classname, "_projectile") > 0)
+		{
+			float pos[3], dir[3];
+			GetEntPropVector(knife, Prop_Data, "m_vecOrigin", pos);
+			TE_SetupArmorRicochet(pos, dir);
+			TE_SendToAll(0.0);
 
-		DispatchKeyValue(knife, "OnUser1", "!self,Kill,,1.0,-1");
-		AcceptEntityInput(knife, "FireUser1");				 							 
+			DispatchKeyValue(knife, "OnUser1", "!self,Kill,,1.0,-1");
+			AcceptEntityInput(knife, "FireUser1");
+		
+			CreateTimer(1.0, Timer_RemoveTK, knife);
+		}
 	}
+	return Plugin_Continue;
+}
+
+Action Timer_RemoveTK(Handle timer, int knife)
+{
+	if (IsValidEntity(knife))
+	{
+		SDKUnhook(knife, SDKHook_Touch, ThrowKnifeHit);
+		AcceptEntityInput(knife, "Kill");
+	}
+	return Plugin_Continue;
 }

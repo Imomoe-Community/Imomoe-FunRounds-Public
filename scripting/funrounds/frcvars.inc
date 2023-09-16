@@ -10,37 +10,36 @@ ConVar cvChickenEater;
 ConVar cvKnockBack;
 
 //global bools
-bool bC4Bounce[MAXENTITIES + 1] = false;
-bool bGhost;
-bool bChrono;
+bool bC4Bounce[MAXENTITIES + 1];
+bool bChrono = false;
 bool bHideHud;
 bool bInfNade;
-bool bDodgeBall;
+bool bDodgeBall = false;
 bool bSpeedChange;
 bool bFallDMG;
 bool bSuicide;
 bool bChickenEater;
 bool bKnockback;
 bool bBuyC4;
-bool bWallHang;
-bool bOneShot;
+bool bWallHang = false;
+bool bOneShot = false;
 bool bNoScope;
-bool bFWS;
+bool bFWS = false;
 bool bVampire;
 bool bEnergyShield;
-bool bThrowKnife;
-bool bAutoFire;
+bool bThrowKnife = false;
+bool bAutoFire = false;
 bool bAimbot = false;
-bool bBossEvolve;
+bool bBossEvolve = false;
 bool frRoundEnd;
-bool frGodMode[MAXPLAYERS + 1] = false;
-bool frKnockBack[MAXPLAYERS + 1] = true;
-bool IsPlayerWallHanged[MAXPLAYERS + 1] = false;
-bool c4Planted = false;
-bool carryingC4[MAXPLAYERS + 1] = false;
-bool frBuyedHealthshot[MAXPLAYERS + 1] = false;
-bool frExplodeBulletCD[MAXPLAYERS + 1] = false;
-bool frAteChicken[MAXPLAYERS + 1] = false;
+bool frGodMode[MAXPLAYERS + 1];
+bool frKnockBack[MAXPLAYERS + 1];
+bool IsPlayerWallHanged[MAXPLAYERS + 1];
+bool c4Planted;
+bool carryingC4[MAXPLAYERS + 1];
+bool frBuyedHealthshot[MAXPLAYERS + 1];
+bool frExplodeBulletCD[MAXPLAYERS + 1];
+bool frAteChicken[MAXPLAYERS + 1];
 
 //int BeamIndex;
 int ChickenC4;
@@ -48,14 +47,13 @@ int plyCarryingC4;
 int plantedC4;
 int secondaryC4;
 int c4weapon;
-bool botweapon[MAXENTITIES + 1] = false;
-float frPlantTime[MAXPLAYERS + 1] = 3.0;
+float frPlantTime[MAXPLAYERS + 1] = {3.0, ...};
 float emptyVector[3];
-int frAteChickenCount[MAXPLAYERS + 1] = 0;
-int frArmorValue[MAXPLAYERS + 1] = 0;
+int frAteChickenCount[MAXPLAYERS + 1];
+int frArmorValue[MAXPLAYERS + 1];
 //Health Percent Base Multiplier
-float frPlayerSpeedMultiplier[MAXPLAYERS + 1] = 1.0; 
-float frPlayerDamageMultiplier[MAXPLAYERS + 1] = 1.0;
+float frPlayerSpeedMultiplier[MAXPLAYERS + 1] = {1.0, ...}; 
+float frPlayerDamageMultiplier[MAXPLAYERS + 1] = {1.0, ...};
 
 
 //Dead Player Explode
@@ -282,6 +280,7 @@ public Action Command_ToggleSound(int client, int args)
 		ClientTurnOffSounds[client] = !ClientTurnOffSounds[client];
 		PrintToChat(client, "[SM] 音效系统%s", ClientTurnOffSounds[client] ? "关闭" : "开启");
 	}
+	return Plugin_Handled;
 }
 
 public int FrMenu(Menu menu, MenuAction action, int param1, int param2) 
@@ -299,4 +298,5 @@ public int FrMenu(Menu menu, MenuAction action, int param1, int param2)
 			menu.Close();
 		}
 	}
+	return 0;
 }

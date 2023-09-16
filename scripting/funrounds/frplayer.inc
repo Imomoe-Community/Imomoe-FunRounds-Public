@@ -1,9 +1,9 @@
-static int frPlayerTeam[MAXPLAYERS + 1] = 0;
-static bool TeamStored = false;
+static int frPlayerTeam[MAXPLAYERS + 1];
+static bool TeamStored;
 
 void SetPlayerColor(int client)
 {
-	if (!IsValidClient(client) || !IsPlayerAlive(client) || bGhost) return;
+	if (!IsValidClient(client) || !IsPlayerAlive(client) || CheckGhostPlayer(client)) return;
 	int R, G, B, A;
 	if (StrEqual(PColor, "black"))
 	{
@@ -78,6 +78,7 @@ public Action Timer_HideHud(Handle timer)
 			}
 		}
 	}
+	return Plugin_Continue;
 }
 
 void StorePlayersTeam()
@@ -211,6 +212,7 @@ public Action Timer_CheckMoving(Handle timer)
 			}
 		}
 	}
+	return Plugin_Continue;
 }
 
 void SetFFA(bool status)

@@ -55,7 +55,7 @@ public Plugin myinfo =
 	url = "https://maiooizumi.xyz"
 };
 
-int iDodgeBallCount[MAXENTITIES + 1] = 0;
+int iDodgeBallCount[MAXENTITIES + 1] = { 0, ...};
 
 
 public void OnPluginStart()
@@ -132,16 +132,16 @@ void InitHooks(int client)
 
 void InitPlayerBools(int client)
 {
-	RemovePlayerGhost(client);
+	PlayerGhostStatus(client, false);
 	RemoveSuicide(client);
-	RemoveBoss(client);
-	SetCheats(client, bAimbot);
+	SetBossStatus(client, false);
+	SetCheats(client, false);
 	frAimbotEnable[client] = true;
 	frTriggeredSuicide[client] = false;
 	frIsChronoClient[client] = false;
 	frIsChronoFreeze[client] = false;
 	frIsChicken[client] = false;
-	KillTimerHandle(frAnimationsTimer[client]);
+	KillChickenTimers(client);
 	frLastFlags[client] = 0;
 	frFlyCounter[client] = 0;
 	frCWasRunning[client] = false;
@@ -155,6 +155,7 @@ public void OnClientPostAdminCheck(int client)
 	{
 		PlayJoinSound(client);
 	}
+	ToggleAimbot(client, bAimbot);
 }
 
 public void OnClientDisconnect(int client)
@@ -221,11 +222,12 @@ public void ServerSettings()
 public Action Timer_PrintInfo(Handle timer, any userid)
 {
 	int client = GetClientOfUserId(userid);
-	if (!IsValidClient(client)) return;
+	if (!IsValidClient(client)) return Plugin_Stop;
 	PrintToChat(client, "[FunRounds!]\x3 \x4FunRounds!开源版本%s ", PLUGIN_VERSION);
 	PrintToChat(client, "[FunRounds!]\x3 \x4作者为 %s", PLUGIN_AUTHOR);
 	PrintToChat(client, "[FunRounds!]\x3 \x4您可以向开发者捐助！ %s", DONATE_URL);
 	PrintToChat(client, "[FunRounds!]\x3 \x4输入!frmenu 或者按“.”查看服务器可用指令");
+	return Plugin_Handled;
 }
 public void Fun_EventRoundStart(Event event, const char [] name, bool dontBroadcast)
 {
@@ -278,6 +280,9 @@ public Action Fun_EventPlayerSpawn(Event event, const char [] name, bool dontBro
 	frArmorValue[client] = 0;
 	if (bChrono) SetChrono(client);
 	SetRespawnArms(client);
+	frGodMode[client] = true;
+	CreateTimer(0.5, RemoveGodMode, GetClientUserId(client));
+	return Plugin_Changed;
 }
 public Action Fun_EventRoundFreezeEnd(Event event, const char [] name, bool dontBroadcast)
 {
@@ -289,12 +294,14 @@ public Action Fun_EventRoundFreezeEnd(Event event, const char [] name, bool dont
 		SetCvar("mp_drop_grenade_enable", "1");
 		SpawnChickens();
 	}
+	return Plugin_Changed;
 }
 
 public Action Fun_EventRoundEnd(Event event, const char [] name, bool dontBroadcast)
 {
 	frRoundEnd = true;
 	TurnOffAllSettings();
+	return Plugin_Changed;
 }
 
 public Action OnWeaponDrop(int client, int weapon)
@@ -359,7 +366,7 @@ public Action ChickenDamaged(int victim, int &attacker, int &inflictor, float &d
 	if (damagetype & DMG_BURN || damagetype & DMG_IGNITE || damagetype & DMG_BLAST)
 		return Plugin_Stop;
 	
-	EmitSoundToAll(ChickenkillSounds[0], victim, GetRandomInt(10, 120));
+	EmitSoundToAll(ChickenkillSounds[0], victim, 70);
 	return Plugin_Continue;
 }
 public Action OnTraceAttack(int victim, int &attacker, int &inflictor, float &damage, int &damagetype, int &ammotype, int hitbox, int hitgroup)
@@ -517,20 +524,21 @@ public Action OnTakeDamage(int victim, int &attacker, int &inflictor, float &dam
 			if (StrEqual(iWeapon, "weapon_decoy") || StrEqual(iWeapon, "decoy_projectile"))
 			{
 				if (frIsSuicideBomber[victim] && frIsGoingSuicide[victim])
-					damage = 600.0;
+					damage = GetHealth(victim) * 6.0;
 				else
-					damage = 200.0;
+					damage = GetHealth(victim) * 2.0;
 			}
 		}
 		// Damage mode
-		if (StrEqual(DamageMode, "random") || RandomDamage())
+		if (StrEqual(DamageMode, "random") || IsRandomDamageEnable())
 		{
 			int dmgrandom = Math_GetRandomInt(0, 99);
 			if (dmgrandom <= 5) SetHealth(attacker, GetHealth(attacker) + RoundToFloor(damage * Math_GetRandomInt(1, 10)));
 			else if (5 < dmgrandom <= 15) damage *= GetRandomFloat(0.0, 0.8);
-			else if (15 < dmgrandom <= 80) damage *= GetRandomFloat(0.8, 2.4);
-			else if (80 < dmgrandom <= 90) damage *= GetRandomFloat(2.4, 5.0);
-			else if (90 < dmgrandom <= 98) damage *= GetRandomFloat(5.0, 20.0);
+			else if (15 < dmgrandom <= 75) damage *= GetRandomFloat(0.8, 2.4);
+			else if (75 < dmgrandom <= 85) damage *= GetRandomFloat(2.4, 5.0);
+			else if (85 < dmgrandom <= 90) damage *= GetRandomFloat(5.0, 20.0);
+			else if (90 < dmgrandom <= 97) damage *= (GetHealth(victim) + 0.00) * GetRandomFloat(0.33, 0.99);
 			else damage = (GetHealth(victim) + 0.00) * 10;
 		}
 		if (StrEqual(DamageMode, "taser"))
@@ -610,7 +618,6 @@ void DelayDamage(DataPack data)
 void CreateDamage(float time, int victim, int attacker, int inflictor, float damage, int damagetype = DMG_GENERIC, int weapon = -1, bool force = false)
 {
 	DataPack Damage = new DataPack();
-	Damage.Reset(true);
 	if (time == 0.0)
 		RequestFrame(DelayDamage, Damage);
 	else
@@ -633,7 +640,7 @@ public Action Hook_SetTransmit(int entity, int client)
 		{
 			return Plugin_Continue;
 		}
-		if (PlayerIsEnemy(entity, client) && !frIsPlayerVisible[entity] && frIsGhostClient[entity] && bGhost)
+		if (PlayerIsEnemy(entity, client) && !frIsPlayerVisible[entity] && CheckGhostPlayer(entity))
 		{
 			return Plugin_Handled;
 		}
@@ -663,6 +670,7 @@ public Action OnTouch(int client, int entity)
 			}
 		}
 	}
+	return Plugin_Changed;
 }
 public Action OnPreThink(int client)
 {
@@ -724,17 +732,18 @@ public Action OnWeaponSwitch(int client, int weapon)
 	if (!cvPluginEnable.BoolValue) return Plugin_Continue;
 	if (frIsChicken[client])
 	{
+		//Hide the real weapon (which can't be moved because of the bonemerge attribute in the model) and creates a fake one, moved to the chicken's side
 		SetWeaponVisibility(client, weapon, false);
 		CreateFakeWeapon(client, weapon);
 	}
 	else
 	{
+		//If player is visible (not a chicken??) make his weapons visible and don't create a fake one
 		SetWeaponVisibility(client, weapon, true);
 	}
-	if (bFWS)
+	if (bFWS && !IsFakeClient(client))
 	{
 		DataPack fws = new DataPack();
-		fws.Reset(true);
 		CreateDataTimer(0.0, Timer_InstantSwitch, fws);
 		fws.WriteCell(client);
 		fws.WriteCell(weapon);
@@ -786,18 +795,12 @@ public Action OnWeaponCanUse(int client, int weapon)
 }
 public Action OnWeaponEquip(int client, int weapon) 
 {
+	if (frIsGoingSuicide[client]) return Plugin_Stop;
 	char Weapons[48];
 	CSGOItems_GetWeaponClassNameByWeapon(weapon, Weapons, sizeof(Weapons));
-	if (IsValidClient(client) && IsPlayerAlive(client) && IsFakeClient(client) && CSGOItems_IsValidWeapon(weapon) && StrContains(Weapons, "weapon_") && !StrEqual(Weapons, "weapon_c4") && CSGOItems_GetWeaponSlotByWeapon(weapon) != CS_SLOT_PRIMARY && CSGOItems_GetWeaponSlotByWeapon(weapon) != CS_SLOT_SECONDARY)
+	if (IsValidClient(client) && IsPlayerAlive(client) && IsFakeClient(client) && CSGOItems_IsValidWeapon(weapon) && StrContains(Weapons, "weapon_") && !StrEqual(Weapons, "weapon_c4"))
 	{
-		if (botweapon[weapon]) return Plugin_Continue;
-		if (CSGOItems_GetWeaponSlotByWeapon(weapon) == CS_SLOT_KNIFE && StrContains(Weapons, "weapon_knife")) return Plugin_Continue;
-		botweapon[weapon] = true;
-		DataPack BotWeapon = new DataPack();
-		BotWeapon.Reset(true);
-		CreateDataTimer(0.1, Timer_BotUseWeapon, BotWeapon);
-		BotWeapon.WriteCell(client);
-		BotWeapon.WriteCell(weapon);
+		CSGOItems_SetActiveWeapon(client, weapon);
 	}
 	if (!client || !c4Planted || !cvPluginEnable.BoolValue) return Plugin_Continue;
 	if ((StrEqual(DefuseMode, "2") || StrEqual(DefuseMode, "carry")) && weapon == EntRefToEntIndex(c4weapon) && IsValidEntity(plantedC4))
@@ -864,18 +867,20 @@ public Action OnReload(int weapon)
 }
 public Action Timer_InstantSwitch(Handle timer, DataPack data)
 {
-	if (!cvPluginEnable.BoolValue || !bFWS) return;
+	if (!cvPluginEnable.BoolValue || !bFWS) return Plugin_Stop;
 	data.Reset();
 	int client = data.ReadCell();
 	int weapon = data.ReadCell();
 	if (IsValidClient(client) && IsPlayerAlive(client) && CSGOItems_IsValidWeapon(weapon))
 		InstantSwitchWeapon(client, weapon);
+	return Plugin_Continue;
 }
 void InstantSwitchWeapon(int client, int weapon)
 {
+	float fGameTime = GetGameTime();
 	SetEntPropEnt(client, Prop_Send, "m_hActiveWeapon", weapon);
-	SetEntPropFloat(weapon, Prop_Send, "m_flNextPrimaryAttack", GetGameTime());
-	SetEntPropFloat(client, Prop_Send, "m_flNextAttack", GetGameTime());
+	SetEntPropFloat(weapon, Prop_Send, "m_flNextPrimaryAttack", fGameTime);
+	SetEntPropFloat(client, Prop_Send, "m_flNextAttack", fGameTime);
 	SetEntProp(GetEntPropEnt(client, Prop_Send, "m_hViewModel"), Prop_Send, "m_nSequence", 0);
 }
 public void OnPostThink(int client)
@@ -899,18 +904,18 @@ public Action OnPlayerRunCmd(int client, int &buttons, int &impulse, float vel[3
 		SetEntPropEnt(client, Prop_Send, "m_hGroundEntity", 0);
 	if (IsValidClient(client) && IsPlayerAlive(client) && frIsGoingSuicide[client])
 	{
-		if (buttons & IN_ATTACK || buttons & IN_ATTACK2 || buttons & IN_ATTACK3)
+		if (buttons & IN_ATTACK2 && StrEqual(GetActiveWeaponClassname(client), "weapon_fists"))
 		{
-			buttons &= ~IN_ATTACK;
+			buttons &= ~IN_ATTACK2;
 			return Plugin_Changed;
 		}
 	}
 	if (cvPluginEnable.BoolValue)
 	{
+		int flags = GetEntityFlags(client);
 		//Ghost
-		if (bGhost)
+		if (CheckGhostPlayer(client))
 		{
-			int flags = GetEntityFlags(client);
 			bool isPlayerInvisible = ((IsPlayerNotMoving(buttons)) || IsPlayerWalking(buttons, flags)) && !IsPlayerAttacking(buttons);
 			if (isPlayerInvisible)
 			{
@@ -938,7 +943,7 @@ public Action OnPlayerRunCmd(int client, int &buttons, int &impulse, float vel[3
 			}
 			frCIsWalking[client] = (buttons & IN_SPEED) || (buttons & IN_DUCK);
 			frCIsMoving[client] = vel[0] > 0.0 || vel[0] < 0.0;
-			if ((buttons & IN_JUMP) && !(GetEntityFlags(client) & FL_ONGROUND))
+			if ((buttons & IN_JUMP) && !(flags & FL_ONGROUND))
 			{
 				SlowPlayerFall(client);
 			}
@@ -1046,8 +1051,13 @@ public Action OnPlayerRunCmd(int client, int &buttons, int &impulse, float vel[3
 				AutoAimCheck(client, buttons);
 			}
 		}
-		if (IsValidClient(client) && IsPlayerAlive(client))
+		if (IsValidClient(client) && IsPlayerAlive(client) && IsAutoStrafePlayer(client))
 		{
+			if (buttons & IN_JUMP && !(flags & FL_ONGROUND) && !(GetEntityMoveType(client) & MOVETYPE_LADDER))
+			{
+				if (GetEntProp(client, Prop_Data, "m_nWaterLevel") <= 1 && !StrEqual(AutoBhop, "1"))
+					buttons &= ~IN_JUMP;
+			}
 			ApplyAutoStrafe(client, buttons, vel, angles);
 		}
 			
@@ -1057,27 +1067,29 @@ public Action OnPlayerRunCmd(int client, int &buttons, int &impulse, float vel[3
 }
 public Action Fun_EventBombBeginPlant(Event event, const char [] name, bool dontBroadcast)
 {
-	if (!cvPluginEnable.BoolValue) return;
+	if (!cvPluginEnable.BoolValue) return Plugin_Continue;
 	int client = GetClientOfUserId(event.GetInt("userid"));
 	if (IsValidClient(client))
 		CreateTimer(0.0, Timer_Plant, GetClientUserId(client));
+	return Plugin_Changed;
 }
 public Action Fun_EventBombBeginDefuse(Event event, const char [] name, bool dontBroadcast)
 {
-	if (!cvPluginEnable.BoolValue) return;
+	if (!cvPluginEnable.BoolValue) return Plugin_Continue;
 	int client = GetClientOfUserId(event.GetInt("userid"));
 	if (IsValidClient(client))
 	{
 		CreateTimer(0.0, Timer_Defuse, GetClientUserId(client));
 	}
+	return Plugin_Changed;
 }
 
 public Action Fun_EventBombPickUp(Event event, const char [] name, bool dontBroadcast)
 {
 	int client = GetClientOfUserId(event.GetInt("userid"));
 	int c4ent = FindEntityByClassname(MAXPLAYERS + 1, "weapon_c4");
-	if (!cvPluginEnable.BoolValue) return;
-	if ((client == plyCarryingC4) || (c4ent == c4weapon) || (c4ent == secondaryC4) || carryingC4[client]) return;
+	if (!cvPluginEnable.BoolValue) return Plugin_Continue;
+	if ((client == plyCarryingC4) || (c4ent == c4weapon) || (c4ent == secondaryC4) || carryingC4[client]) return Plugin_Continue;
 	if (cvSuicideBomber.BoolValue && bSuicide && IsValidClient(client) && !frIsSuicideBomber[client])
 	{
 		if (GetClientTeam(client) == CS_TEAM_T)
@@ -1096,24 +1108,18 @@ public Action Fun_EventBombPickUp(Event event, const char [] name, bool dontBroa
 		frC4Bounce[c4ent] = INVALID_HANDLE;
 		bC4Bounce[c4ent] = false;
 	}
+	return Plugin_Changed;
 }
 public Action Fun_EventBombDrop(Event event, const char [] name, bool dontBroadcast)
 {
-	if (!cvPluginEnable.BoolValue) return;
+	if (!cvPluginEnable.BoolValue) return Plugin_Continue;
 	int client = GetClientOfUserId(event.GetInt("userid"));
 	if (IsValidClient(client) && frIsSuicideBomber[client]) frIsSuicideBomber[client] = false;
-/*
-	int c4ent = FindEntityByClassname(MAXPLAYERS + 1, "weapon_c4");
-	if (IsValidEntity(c4ent) && !c4Planted)
-	{
-		bC4Bounce[c4ent] = true;
-		FR_C4Bounce(c4ent);
-	}	
-*/
+	return Plugin_Changed;
 }
 public Action Fun_EventBombPlanted(Event event, const char [] name, bool dontBroadcast)
 {
-	if (!cvPluginEnable.BoolValue) return;
+	if (!cvPluginEnable.BoolValue) return Plugin_Continue;
 	int client = GetClientOfUserId(event.GetInt("userid"));
 	int c4ent = FindEntityByClassname(MAXPLAYERS + 1, "planted_c4");
 	SetBombTimer(c4ent);
@@ -1182,6 +1188,7 @@ public Action Fun_EventBombPlanted(Event event, const char [] name, bool dontBro
 			}
 		}
 	}
+	return Plugin_Changed;
 }
 public Action OnShouldDisplay(int ent, int client)
 {
@@ -1193,17 +1200,17 @@ public Action OnShouldDisplay(int ent, int client)
 }
 public Action Fun_EventInspectWeapon(Event event, const char [] name, bool dontBroadcast)
 {
-	if (!cvPluginEnable.BoolValue) return;
+	if (!cvPluginEnable.BoolValue) return Plugin_Continue;
 	int client = GetClientOfUserId(event.GetInt("userid"));
 	int weapon = GetEntPropEnt(client, Prop_Send, "m_hActiveWeapon");
-	if ((client == plyCarryingC4) || (weapon == c4weapon) || (weapon == secondaryC4) || carryingC4[client]) return;
-	if (!CSGOItems_IsValidWeapon(weapon)) return;
+	if ((client == plyCarryingC4) || (weapon == c4weapon) || (weapon == secondaryC4) || carryingC4[client]) return Plugin_Continue;
+	if (!CSGOItems_IsValidWeapon(weapon)) return Plugin_Continue;
 	char Weapons[64];
 	GetEdictClassname(weapon, Weapons, sizeof(Weapons));
 	if (cvSuicideBomber.BoolValue && bSuicide && IsPlayerAlive(client) && frIsSuicideBomber[client] && !frIsGoingSuicide[client])
 	{
 		if (StrEqual(Weapons, "weapon_c4"))
-			BomberGoSuicide(client);
+			RequestFrame(BomberGoSuicide, client);
 	}
 	if (frIsChronoClient[client] && !frIsChronoFreeze[client] && IsPlayerAlive(client))
 	{
@@ -1214,13 +1221,14 @@ public Action Fun_EventInspectWeapon(Event event, const char [] name, bool dontB
 			PrintHintText(client, "武器已切换为%s", frChronoGunStatus[client] ? "抹消枪" : "传送枪");
 		}
 	}
+	return Plugin_Changed;
 }
 public Action Fun_EventPlayerHurt(Event event, const char [] name, bool dontBroadcast)
 {
 	
 	int client = GetClientOfUserId(event.GetInt("userid"));
 	int attacker = GetClientOfUserId(event.GetInt("attacker"));
-	if (!IsValidClient(attacker)) return;
+	if (!IsValidClient(attacker)) return Plugin_Continue;
 	int dmg_health = event.GetInt("dmg_health");
 	int dmg_armor = event.GetInt("dmg_armor");
 	int attackerH = GetEntProp(attacker, Prop_Data, "m_iHealth");
@@ -1251,7 +1259,7 @@ public Action Fun_EventPlayerHurt(Event event, const char [] name, bool dontBroa
 			}
 		}
 	}
-	if (!cvPluginEnable.BoolValue) return;
+	if (!cvPluginEnable.BoolValue) return Plugin_Continue;
 	if (bVampire)
 	{
 		if (IsValidClient(attacker) && IsPlayerAlive(attacker) && (attacker != client))
@@ -1268,15 +1276,21 @@ public Action Fun_EventPlayerHurt(Event event, const char [] name, bool dontBroa
 	{
 		SetHealth(client, GetHealth(client) + dmg_health);
 		SetArmorValue(client, GetEntProp(client, Prop_Send, "m_ArmorValue") + dmg_armor);
-		return;
+		return Plugin_Continue;
 	}
-	if (GetEntProp(client, Prop_Send, "m_bHasHelmet") == 1 && (hitgroup == 1 || event.GetBool("headshot")) && attacker != client)
+	if (GetEntProp(client, Prop_Send, "m_bHasHeavyArmor") == 0 && (GetEntProp(client, Prop_Send, "m_bHasHelmet") == 1 && (hitgroup == 1) || event.GetBool("headshot") && (attacker != client)))
 	{
 			if ((!StrEqual(FriendlyFire, "0") && !PlayerIsEnemy(client, attacker)) || (PlayerIsEnemy(client, attacker) && IsValidClient(attacker)))
-				SetEntProp(client, Prop_Send, "m_bHasHelmet", 0);
+			{
+				int random = Math_GetRandomInt(0, 3);
+				if (random == 3)
+					SetEntProp(client, Prop_Send, "m_bHasHelmet", 0);
+			}
+				
 	}
 	CheckHealthPercent(client);
 	CheckArmorValue(client);
+	return Plugin_Changed;
 }
 public Action Fun_EventPlayerDeath(Event event, const char [] name, bool dontBroadcast)
 {
@@ -1307,8 +1321,9 @@ public Action Fun_EventPlayerDeath(Event event, const char [] name, bool dontBro
 		if (frIsChicken[client])
 			ChickenStatus(client, false);
 		//Ghost
-		RemovePlayerGhost(client);
+		PlayerGhostStatus(client, false);
 		frIsPlayerVisible[client] = false;
+		StopBreathSound(client);
 		//GodMode
 		if (IsValidClient(attacker) && IsPlayerAlive(attacker) && !IsFakeClient(attacker))
 		{
@@ -1348,9 +1363,6 @@ public Action Fun_EventPlayerDeath(Event event, const char [] name, bool dontBro
 					display.FireToClient(i);
 				}
 				display.Cancel();
-				//set attacker and weapon
-				event.SetInt("attacker", GetClientUserId(frDiedByBomb[client]));
-				event.SetString("weapon", "c4");
 				RemoveSuicide(client);
 				int Ragdoll = GetEntPropEnt(client, Prop_Send, "m_hRagdoll");
 				AcceptEntityInput(Ragdoll, "Ignite");
@@ -1418,7 +1430,7 @@ public Action Fun_EventPlayerDeath(Event event, const char [] name, bool dontBro
 			else
 				SetArmorValue(client, (armor * 2), true);
 		}
-		if (!StrEqual(BossMode, "0") && IsBossAlive())
+		if (!StrEqual(BossMode, "0") && CheckBoss(client))
 		{
 			CheckBossAlive();
 			if (!IsBossAlive())
@@ -1438,7 +1450,7 @@ public Action Fun_EventPlayerDeath(Event event, const char [] name, bool dontBro
 		frArmorValue[client] = 0;
 		ClearChickenTimer(client);
 		RemoveChrono(client);
-		RemoveBoss(client);
+		SetBossStatus(client, false);
 		SetCheats(client, false);
 	}
 	PlayKillSounds(client, attacker, Weapons, event.GetBool("headshot"));
@@ -1446,10 +1458,11 @@ public Action Fun_EventPlayerDeath(Event event, const char [] name, bool dontBro
 }
 public Action Fun_EventWeaponFire(Event event, const char [] name, bool dontBroadcast)
 {
-	if (!cvPluginEnable.BoolValue) return;
+	if (!cvPluginEnable.BoolValue) return Plugin_Continue;
 	int client = GetClientOfUserId(event.GetInt("userid"));
 	char Weapons[64];
 	event.GetString("weapon", Weapons, sizeof(Weapons));
+	int buttons = GetClientButtons(client);
 	if (StringToFloat(SelfDMG) > 0.0 && !StrEqual(SelfDMG, "0.0"))
 	{
 		if (GetHealth(client) <= 1)
@@ -1479,13 +1492,12 @@ public Action Fun_EventWeaponFire(Event event, const char [] name, bool dontBroa
 	}
 	if (StrEqual(InfAmmo, "1"))
 	{
-		int buttons = GetClientButtons(client);
 		int weapon = GetEntPropEnt(client, Prop_Send, "m_hActiveWeapon");
 		if (CSGOItems_IsValidWeapon(weapon) && (buttons & IN_ATTACK || buttons & IN_ATTACK2))
 		{
 			int slot = CSGOItems_GetWeaponSlotByWeapon(CSGOItems_GetActiveWeapon(client));
 			if (slot != CS_SLOT_GRENADE)
-				CSGOItems_SetWeaponAmmo(weapon, 999, GetEntProp(weapon, Prop_Send, "m_iClip1") + 1);
+				CSGOItems_SetWeaponAmmo(weapon, 999, 999);
 		}
 	}
 	if (frThrowKnifePlayer[client])
@@ -1497,16 +1509,18 @@ public Action Fun_EventWeaponFire(Event event, const char [] name, bool dontBroa
 	}
 	if (IsValidClient(client) && IsPlayerAlive(client) && IsAimbotavailable(client))
 	{
+		if ((buttons & IN_RELOAD) || (buttons & IN_USE)) return Plugin_Continue;
 		SetClientEyePos(client);
 	}
-	
+	return Plugin_Changed;
 }
 
 public Action Fun_EventItemPickup(Event event, const char [] name, bool dontBroadcast)
 {
-	if (!cvPluginEnable.BoolValue) return;
+	if (!cvPluginEnable.BoolValue) return Plugin_Continue;
 	int client = GetClientOfUserId(event.GetInt("userid"));
 	if (frIsGoingSuicide[client]) DropPlayerWeapons(client);
+	return Plugin_Changed;
 }
 public Action Fun_EventBulletImpact(Event event, const char[] name, bool dontBroadcast)
 {
@@ -1522,7 +1536,7 @@ public Action Fun_EventBulletImpact(Event event, const char[] name, bool dontBro
 			FireTeslaBullet(client, impact_pos);
 		}
 		float expbulletcd = StringToFloat(ExplodeBullet);
-		if ((frExplodeBulletClient[client] || (!StrEqual(ExplodeBullet, "-1") && expbulletcd >= 0.0 )) && !frExplodeBulletCD[client])
+		if ((IsExplodingBulletClient(client) || (!StrEqual(ExplodeBullet, "-1") && expbulletcd >= 0.0 )) && !frExplodeBulletCD[client])
 		{
 			int weapon = GetEntPropEnt(client, Prop_Send, "m_hActiveWeapon");
 			char classname[32];
@@ -1535,6 +1549,7 @@ public Action Fun_EventBulletImpact(Event event, const char[] name, bool dontBro
 			}
 		}
 	}
+	return Plugin_Changed;
 }
 public Action Fun_BulletShot(const char[] te_name, const int[] Players, int numClients, float delay)
 {
@@ -1558,12 +1573,14 @@ public Action Fun_BulletShot(const char[] te_name, const int[] Players, int numC
 			delete trace;
 		}
 	}
+	return Plugin_Changed;
 }
 
 public Action Fun_EventPlayerBlind(Event event, const char[] name, bool dontBroadcast)
 {
 	int client = GetClientOfUserId(event.GetInt("userid"));
 	if (IsValidClient(client) && IsPlayerAlive(client)) PlayBlindSound(client);
+	return Plugin_Changed;
 }
 
 void GiveWeapons()
@@ -1650,8 +1667,14 @@ void SetSpeed(int client, float value = 1.0, bool ignoreGlobalSpeed = false)
 			value *= StringToFloat(PSpeed);
 		}
 		if (value <= 0.0) value = 0.1;
-		if (frIsGhostClient[client]) value *= 1.05;
+		if (CheckGhostPlayer(client)) value *= 1.05;
+		float gravity;
+		if (!StrEqual(Gravity, "1.0"))
+			gravity = StringToFloat(Gravity);
+		else
+			gravity = GetEntityGravity(client);
 		SetEntPropFloat(client, Prop_Data, "m_flLaggedMovementValue", value * frPlayerSpeedMultiplier[client]);
+		SetEntityGravity(client, gravity);
 	}
 }
 
@@ -1710,6 +1733,7 @@ public Action Timer_Thirdperson(Handle timer)
 			ClientCommand(client, "thirdperson");
 		}
 	}
+	return Plugin_Continue;
 }
 
 public void OnEntityCreated(int entity, const char [] classname)
@@ -1748,7 +1772,7 @@ void OnChickenDeath(const char[] output, int caller, int activator, float delay)
 }
 public Action OnEntityUse(int entity, int activator, int caller, UseType type, float value)
 {
-	EmitSoundToAll(ChickenkillSounds[0], activator, Math_GetRandomInt(10, 120));
+	EmitSoundToAll(ChickenkillSounds[0], activator, 70);
 	if (entity == ChickenC4)
 	{
 		PrintToChat(activator, "[SM] 背C4的鸡不能用来吃！");
@@ -1764,7 +1788,7 @@ public Action OnEntityUse(int entity, int activator, int caller, UseType type, f
 			{
 				EatChicken(entity, activator);
 				KillTimerHandle(frChickenEating[activator]);
-				frChickenEating[activator] = CreateTimer(15.0, Timer_EatingChicken, GetClientUserId(activator), TIMER_REPEAT);
+				frChickenEating[activator] = CreateTimer(20.0, Timer_EatingChicken, GetClientUserId(activator), TIMER_REPEAT);
 				PrintToChat(activator, "[SM] \x3 \x4提示：您已经吃饱了，消化需要一定时间，强行吃的话可能会掉血甚至撑死");
 				return Plugin_Handled;
 			}
@@ -1813,6 +1837,7 @@ public Action TouchPost(int entity, int client)
 {
 	if (IsValidClient(client) && StrEqual(DefuseMode, "none"))
 		SetEntProp(client, Prop_Send, "m_bInBombZone", 1);
+	return Plugin_Changed;
 }
 public Action OnEntitySpawned(int entity)
 {
@@ -1847,6 +1872,7 @@ public Action OnEntitySpawned(int entity)
 		SetEntProp(entity, Prop_Data, "m_takedamage", 2);
 		SDKHook(entity, SDKHook_OnTakeDamage, OnGrenadeTakeDamage);
 	}
+	return Plugin_Changed;
 }
 
 public Action OnGrenadeTakeDamage(int victim, int &attacker, int &inflictor, float &damage, int &damagetype, int &weapon, float damageForce[3], float damagePosition[3])
@@ -1866,17 +1892,19 @@ public Action OnEntityTouch(int entity, int other)
 		if (!IsValidClient(client))
 		{
 			KillEntity(entity);
-			return;
+			return Plugin_Changed;
 		}
 		++iDodgeBallCount[entity];
 		if (iDodgeBallCount[entity] >= 2)
 			KillEntity(entity);
 	}
+	return Plugin_Changed;
 }
 public Action CS_OnTerminateRound(float& delay, CSRoundEndReason& reason)
 {
 	int winner = GetWinner(view_as<int>(reason));
 	RoundEndSound(winner);
+	return Plugin_Changed;
 }
 
 stock bool KillEntity(int entity)
@@ -1886,6 +1914,7 @@ stock bool KillEntity(int entity)
 		AcceptEntityInput(entity, "kill");
 		iDodgeBallCount[entity] = 0;
 	}
+	return true;
 }
 stock void SetNoScope(int weapon)
 {
@@ -1903,6 +1932,7 @@ public Action RemoveGodMode(Handle timer, any userid)
 {
 	int client = GetClientOfUserId(userid);
 	frGodMode[client] = false;
+	return Plugin_Continue;
 }
 public Action Timer_SpeedChange(Handle timer)
 {
@@ -2046,30 +2076,16 @@ public Action Timer_HealthLeak(Handle timer)
 				int hp = GetHealth(client);
 				if (hp > BaseHealth)
 				{
-					hp = RoundToCeil((hp + 0.0) * 0.92);
+					hp = RoundToCeil((hp + 0.0) * 0.95);
 					if (hp < BaseHealth) hp = BaseHealth;
 					SetHealth(client, hp);
 				}
 			}
 		}
 	}
+	return Plugin_Continue;
 }
 
-public Action Timer_BotUseWeapon(Handle timer, DataPack data)
-{
-	data.Reset();
-	int client = data.ReadCell();
-	int weapon = data.ReadCell();
-	if (IsValidClient(client) && IsPlayerAlive(client) && IsFakeClient(client) && CSGOItems_IsValidWeapon(weapon) && botweapon[weapon])
-	{
-		char Weapons[48];
-		CSGOItems_GetWeaponClassNameByWeapon(weapon, Weapons, sizeof(Weapons));
-		EquipPlayerWeapon(client, weapon);
-		FakeClientCommand(client, "use %s", Weapons);
-		SetActiveWeapon(client, weapon);
-		botweapon[weapon] = false;
-	}
-}
 
 public Action Command_NadeBug(int client, int args)
 {
@@ -2100,32 +2116,6 @@ public Action Command_NadeBug(int client, int args)
 }
 
 
-public Action Timer_EatingChicken(Handle timer, any userid)
-{
-	int client = GetClientOfUserId(userid);
-	if (IsValidClient(client) && IsPlayerAlive(client))
-	{
-		if (frAteChickenCount[client] > 0)
-		{
-			--frAteChickenCount[client];
-			if (frAteChickenCount[client] == 0)
-			{
-				frAteChicken[client] = false;
-				PrintToChat(client, "[SM] \x3 \x4你饿了，想再吃一只鸡。");
-				RequestFrame(ClearChickenTimer, client);
-			}
-			else
-			{
-				PrintToChat(client, "[SM] \x3 \x4看起来你消化掉了一只鸡。");
-			}
-		}
-	}
-}
-void ClearChickenTimer(int client)
-{
-	KillTimerHandle(frChickenEating[client]);
-}
-
 public Action Command_FRCommands(int client, int args)
 {
 	Menu menu = new Menu(FrMenu, MenuAction_End);
@@ -2137,7 +2127,7 @@ public Action Command_FRCommands(int client, int args)
 		if (frIsSuicideBomber[client] && !frIsGoingSuicide[client])
 			menu.AddItem("fr_suicide", "开启自爆");
 		else if (!frIsSuicideBomber[client] && GetClientTeam(client) == CS_TEAM_T && (CS_GetClientContributionScore(client) >= 5 || GetMoney(client) >= 10000))
-			menu.AddItem("fr_suicide", "自动购买c4并开启自爆");
+			menu.AddItem("fr_suicide", "一键购买c4并开启自爆");
 	}
 	if (bChrono)
 		menu.AddItem("sm_tpbug", "!tpbug 瞬移模式中不小心瞬移到空气墙中使用");
@@ -2246,13 +2236,19 @@ public Action CS_OnBuyCommand(int client, const char[] weapon)
 			if (money >= price)
 			{
 				SetMoney(client, money - price);
-				GivePlayerItem(client, "item_defuser");
+				SetEntProp(client, Prop_Send, "m_bHasDefuser", 1);
+				return Plugin_Continue;
 			}
 		}
-		if (StrContains(weapon, "vest", false))
+		if (StrEqual(weapon, "heavyassaultsuit") || StrEqual(weapon, "heavyarmor"))
+		{
+			ClientCommand(client, "sm_heavyarmor");
+			return Plugin_Handled;
+		}
+		if (StrEqual(weapon, "vesthelm") || StrEqual(weapon, "vest") || StrEqual(weapon, "assaultsuit") || StrEqual(weapon, "kevlar"))
 		{
 			int ap = GetArmorValue(client);
-			if (StrEqual(weapon, "vesthelm"))
+			if (StrEqual(weapon, "vesthelm") || StrEqual(weapon, "assaultsuit"))
 			{
 				if (IsPlayerHasHelmet(client))
 				{
@@ -2263,8 +2259,9 @@ public Action CS_OnBuyCommand(int client, const char[] weapon)
 					}
 					if (money >= price)
 					{
-						 SetMoney(client, money - price);
-						 SetArmorValue(client, ap, true);
+						SetMoney(client, money - price);
+						SetArmorValue(client, ap, true);
+						return Plugin_Continue;
 					}
 				}
 				else
@@ -2279,6 +2276,7 @@ public Action CS_OnBuyCommand(int client, const char[] weapon)
 					{
 						 SetMoney(client, money - price);
 						 SetArmorValue(client, ap, true);
+						 return Plugin_Continue;
 					}
 				}
 				
@@ -2294,20 +2292,27 @@ public Action CS_OnBuyCommand(int client, const char[] weapon)
 				{
 					 SetMoney(client, money - price);
 					 SetArmorValue(client, ap, true);
+					 return Plugin_Continue;
 				}
 			}
 		}
-		for (int num = 0; num < 36; ++num)
+		else
 		{
-			if (StrEqual(frBuyMenuWeapons[num], weapon))
+			for (int num = 0; num < 37; ++num)
 			{
-				Format(classname, sizeof(classname), "weapon_%s", weapon);
-				price = CS_GetWeaponPrice(client, CS_AliasToWeaponID(classname));
-				if (money >= price)
+				if (StrEqual(frBuyMenuWeapons[num], weapon))
 				{
-					SetMoney(client, money - price);
-					GivePlayerItem(client, classname);
-					return Plugin_Stop;
+					Format(classname, sizeof(classname), "weapon_%s", weapon);
+					if (StrEqual(weapon, "fn57"))
+						classname = "weapon_fiveseven";
+					price = CS_GetWeaponPrice(client, CS_AliasToWeaponID(classname));
+					if (money >= price)
+					{
+						SetMoney(client, money - price);
+						int slot = CSGOItems_GetWeaponSlotByClassName(classname);
+						ReplacePlayerWeapon(client, slot, classname);
+						return Plugin_Stop;
+					}
 				}
 			}
 		}
